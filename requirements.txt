@@ -1,0 +1,17 @@
+# Core dependencies
+streamlit==1.28.0
+pandas==2.0.3
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Export functionality
+openpyxl==3.1.2
+
+# Optional: For enhanced functionality
+plotly==5.17.0
+altair==5.1.2
+
+# Development dependencies (optional)
+pytest==7.4.0
+black==23.9.1
+flake8==6.1.0
