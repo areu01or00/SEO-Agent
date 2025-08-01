@@ -94,13 +94,14 @@ if 'serp_data' not in st.session_state:
     st.session_state.serp_data = None
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🔑 Keyword Research", 
     "📊 SERP Analysis", 
     "🏆 Competitor Analysis",
     "📈 Trends & Volume",
     "🔍 Content Analysis",
-    "📋 Reports"
+    "📋 Reports",
+    "📝 Content Brief"
 ])
 
 with tab1:
@@ -611,6 +612,140 @@ with tab6:
                     st.json(report["summary"])
 
 # Enhanced trend analysis has been moved to tab4
+
+with tab7:
+    st.markdown("### 📝 Content Brief Generator")
+    st.markdown("Generate comprehensive content briefs based on keyword and SERP analysis")
+    
+    # Content brief generation section
+    brief_col1, brief_col2 = st.columns([2, 1])
+    
+    with brief_col1:
+        # Keyword selection
+        st.markdown("#### 🎯 Select Keyword")
+        
+        # Get available keywords from session state
+        available_keywords = []
+        if st.session_state.keywords_data:
+            available_keywords = [kw['keyword'] for kw in st.session_state.keywords_data]
+        
+        if available_keywords:
+            selected_keyword = st.selectbox(
+                "Choose a keyword to create content brief for:",
+                options=available_keywords,
+                help="Select from your researched keywords"
+            )
+        else:
+            selected_keyword = st.text_input(
+                "Enter a keyword:",
+                placeholder="e.g., best seo tools 2024"
+            )
+            st.info("💡 Tip: Research keywords in Tab 1 first for better results")
+        
+        # Target audience
+        target_audience = st.text_input(
+            "Target Audience",
+            value="general",
+            placeholder="e.g., small business owners, marketing professionals"
+        )
+        
+        # Additional context
+        content_type = st.selectbox(
+            "Content Type",
+            options=["Blog Post", "Landing Page", "Product Page", "Guide/Tutorial", "Comparison Article"],
+            index=0
+        )
+        
+        # Generate button
+        if st.button("🚀 Generate Content Brief", type="primary"):
+            if selected_keyword:
+                with st.spinner("🔄 Generating comprehensive content brief..."):
+                    try:
+                        agent = KeywordAgent()
+                        
+                        # Get SERP data if not already available
+                        serp_results = []
+                        if st.session_state.serp_data:
+                            # Use existing SERP data if available
+                            serp_results = st.session_state.serp_data
+                        else:
+                            # Fetch fresh SERP data
+                            serp_results = agent.analyze_serp(selected_keyword, country, language)
+                        
+                        # Generate content brief
+                        brief = agent.llm_client.generate_content_brief(
+                            keyword=selected_keyword,
+                            serp_results=serp_results,
+                            target_audience=target_audience
+                        )
+                        
+                        # Store in session state
+                        st.session_state.content_brief = {
+                            'keyword': selected_keyword,
+                            'audience': target_audience,
+                            'type': content_type,
+                            'brief': brief,
+                            'timestamp': pd.Timestamp.now().isoformat()
+                        }
+                        
+                        st.success("✅ Content brief generated successfully!")
+                        
+                    except Exception as e:
+                        st.error(f"Error generating content brief: {str(e)}")
+            else:
+                st.warning("Please enter or select a keyword")
+    
+    with brief_col2:
+        st.markdown("#### 💡 Brief Features")
+        st.info("""
+        **What's included:**
+        - 📌 3 title suggestions
+        - 📋 Key topics to cover
+        - 🏗️ Content structure
+        - 📏 Word count recommendation
+        - 🎯 Unique angle suggestions
+        - 📢 CTA recommendations
+        """)
+    
+    # Display generated brief
+    if 'content_brief' in st.session_state and st.session_state.content_brief:
+        st.markdown("---")
+        st.markdown("### 📄 Generated Content Brief")
+        
+        # Brief metadata
+        meta_col1, meta_col2, meta_col3 = st.columns(3)
+        with meta_col1:
+            st.metric("Keyword", st.session_state.content_brief['keyword'])
+        with meta_col2:
+            st.metric("Audience", st.session_state.content_brief['audience'])
+        with meta_col3:
+            st.metric("Content Type", st.session_state.content_brief['type'])
+        
+        # Display the brief
+        with st.expander("📝 Full Content Brief", expanded=True):
+            st.markdown(st.session_state.content_brief['brief'])
+        
+        # Export options
+        st.markdown("#### 📥 Export Options")
+        export_col1, export_col2 = st.columns(2)
+        
+        with export_col1:
+            # Export as text
+            st.download_button(
+                label="📄 Download as Text",
+                data=f"Content Brief for: {st.session_state.content_brief['keyword']}\n\n{st.session_state.content_brief['brief']}",
+                file_name=f"content_brief_{st.session_state.content_brief['keyword'].replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.txt",
+                mime="text/plain"
+            )
+        
+        with export_col2:
+            # Export as JSON
+            st.download_button(
+                label="📊 Download as JSON",
+                data=json.dumps(st.session_state.content_brief, indent=2),
+                file_name=f"content_brief_{st.session_state.content_brief['keyword'].replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.json",
+                mime="application/json"
+            )
 
 # Sidebar
 with st.sidebar:

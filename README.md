@@ -9,7 +9,8 @@ An intelligent keyword research tool powered by DataForSEO API and AI analysis t
 - 🤖 **AI Insights**: LLM-powered keyword analysis and content recommendations
 - 📥 **Export Options**: CSV and Excel export functionality
 - 🎯 **Advanced Filtering**: Filter by country, language, volume, and difficulty
-- 📈 **Trend Analysis**: Historical search volume trends (coming soon)
+- 📈 **Trend Analysis**: Historical search volume trends and Google Trends integration
+- 📝 **Content Brief Generation**: AI-powered content briefs based on keyword and SERP data
 
 ## Setup
 
@@ -111,9 +112,9 @@ python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent()
 
 ## Future Enhancements
 
-- [ ] Trend analysis with historical data
+- [x] Trend analysis with historical data (Available in Tab 4)
 - [ ] Competitor keyword gap analysis
-- [ ] Content brief generation
+- [x] Content brief generation (Available in Tab 7)
 - [ ] Keyword clustering visualization
 - [ ] Batch keyword processing
 - [ ] Custom model fine-tuning
