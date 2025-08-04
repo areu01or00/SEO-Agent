@@ -176,13 +176,19 @@ class DataForSEOMCP:
         """Get keyword suggestions via MCP"""
         
         try:
+            # Preprocess seed keyword for better results  
+            processed_keyword = self._preprocess_keywords([seed_keyword])[0]
+            if len(seed_keyword.split()) > 4:
+                processed_keyword = self._simplify_keywords([seed_keyword])[0]
+                print(f"🔑 Simplified keyword query: '{seed_keyword}' → '{processed_keyword}'")
+            
             # Try MCP first
             if not self.use_fallback:
                 result = self.client.call_tool(
                     "dataforseo",
                     "dataforseo_labs_google_keyword_ideas",
                     {
-                        "keywords": [seed_keyword],
+                        "keywords": [processed_keyword],
                         "location_name": location,
                         "language_code": language.lower()[:2],
                         "limit": limit
@@ -208,13 +214,19 @@ class DataForSEOMCP:
         """Get SERP analysis via MCP"""
         
         try:
+            # Preprocess keyword for better results
+            processed_keyword = self._preprocess_keywords([keyword])[0]
+            if len(keyword.split()) > 4:
+                processed_keyword = self._simplify_keywords([keyword])[0]
+                print(f"🔍 Simplified SERP query: '{keyword}' → '{processed_keyword}'")
+            
             # Try MCP first
             if not self.use_fallback:
                 result = self.client.call_tool(
                     "dataforseo",
                     "serp_organic_live_advanced",
                     {
-                        "keyword": keyword,
+                        "keyword": processed_keyword,
                         "location_name": location,
                         "language_code": language.lower()[:2],
                         "depth": 10
@@ -293,6 +305,31 @@ class DataForSEOMCP:
             print(f"MCP competitor analysis failed: {str(e)}")
             return generate_mock_competitor_data(target_domain, limit)
     
+    def _preprocess_keywords(self, keywords: List[str]) -> List[str]:
+        """Preprocess keywords for better API results"""
+        processed = []
+        for kw in keywords:
+            # Truncate very long keywords
+            if len(kw) > 80:
+                kw = kw[:80]
+            # Remove special characters that might cause issues
+            kw = kw.replace('"', '').replace("'", '')
+            processed.append(kw)
+        return processed
+    
+    def _simplify_keywords(self, keywords: List[str]) -> List[str]:
+        """Simplify complex keywords to get better data"""
+        simplified = []
+        for kw in keywords:
+            # For very specific queries, extract core terms
+            if len(kw.split()) > 5:
+                # Take first 3-4 words for better results
+                words = kw.split()[:4]
+                simplified.append(' '.join(words))
+            else:
+                simplified.append(kw)
+        return simplified
+    
     def get_search_volume_data(
         self,
         keywords: List[str],
@@ -302,19 +339,27 @@ class DataForSEOMCP:
         """Get search volume data for specific keywords"""
         
         try:
+            # Preprocess long/complex keywords
+            processed_keywords = self._preprocess_keywords(keywords)
+            
             if not self.use_fallback:
                 result = self.client.call_tool(
                     "dataforseo",
                     "keywords_data_google_ads_search_volume",
                     {
-                        "keywords": keywords,
+                        "keywords": processed_keywords,
                         "location_name": location,
                         "language_code": language.lower()[:2]
                     }
                 )
                 
                 if not result.get("error"):
-                    return process_search_volume_data(result)
+                    volume_data = process_search_volume_data(result)
+                    # Add warning for zero-volume keywords
+                    for i, vd in enumerate(volume_data):
+                        if vd.get('search_volume', 0) == 0 and len(keywords[i]) > 30:
+                            vd['note'] = 'Query too specific - try shorter keywords'
+                    return volume_data
             
             return generate_mock_search_volume_data(keywords)
             
@@ -331,12 +376,19 @@ class DataForSEOMCP:
         """Get Google Trends data for keywords"""
         
         try:
+            # Preprocess and simplify keywords for trends
+            processed_keywords = self._preprocess_keywords(keywords)
+            # For trends, simplify complex queries more aggressively
+            if any(len(kw.split()) > 4 for kw in processed_keywords):
+                processed_keywords = self._simplify_keywords(processed_keywords)
+                print(f"📈 Simplified query for trends: {processed_keywords}")
+            
             if not self.use_fallback:
                 result = self.client.call_tool(
                     "dataforseo",
                     "keywords_data_google_trends_explore",
                     {
-                        "keywords": keywords,
+                        "keywords": processed_keywords,
                         "location_name": location,
                         "time_range": time_range,
                         "type": "web"
@@ -344,7 +396,11 @@ class DataForSEOMCP:
                 )
                 
                 if not result.get("error"):
-                    return process_trends_data(result)
+                    trends_data = process_trends_data(result)
+                    # Add note if keyword was simplified
+                    if processed_keywords != keywords:
+                        trends_data['note'] = f'Showing trends for simplified query: {", ".join(processed_keywords)}'
+                    return trends_data
             
             return generate_mock_trends_data(keywords)
             

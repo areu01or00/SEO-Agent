@@ -29,7 +29,7 @@ DATAFORSEO_API_KEY=your_api_key
 
 # OpenRouter API
 OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=google/gemini-2.0-flash-001
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite
 ```
 
 3. **Run the Application**

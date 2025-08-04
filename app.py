@@ -94,14 +94,15 @@ if 'serp_data' not in st.session_state:
     st.session_state.serp_data = None
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🔑 Keyword Research", 
     "📊 SERP Analysis", 
     "🏆 Competitor Analysis",
     "📈 Trends & Volume",
     "🔍 Content Analysis",
     "📋 Reports",
-    "📝 Content Brief"
+    "📝 Content Brief",
+    "✍️ Content Generator"
 ])
 
 with tab1:
@@ -111,6 +112,7 @@ with tab1:
     with col1:
         seed_keyword = st.text_input(
             "Enter your seed keyword",
+            key="keyword_research_input",
             placeholder="e.g., SEO tools, digital marketing, etc."
         )
     
@@ -291,6 +293,7 @@ with tab3:
         st.markdown("#### 🔍 Analyze Competitor Domain")
         competitor_domain = st.text_input(
             "Enter competitor domain",
+            key="competitor_domain_input",
             placeholder="e.g., semrush.com, ahrefs.com"
         )
         
@@ -365,6 +368,7 @@ with tab4:
         st.markdown("#### 📊 Search Volume Data")
         volume_keywords = st.text_area(
             "Enter keywords (one per line):",
+            key="volume_keywords_input",
             placeholder="seo tools\ndigital marketing\nkeyword research"
         )
         
@@ -402,6 +406,7 @@ with tab4:
         st.markdown("#### 📈 Google Trends")
         trends_keywords = st.text_input(
             "Enter keywords for trends (comma-separated):",
+            key="trends_keywords_input",
             placeholder="seo tools, digital marketing"
         )
         time_range = st.selectbox(
@@ -443,6 +448,7 @@ with tab5:
     
     content_url = st.text_input(
         "Enter URL to analyze:",
+        key="content_url_input",
         placeholder="https://example.com/page"
     )
     
@@ -638,6 +644,7 @@ with tab7:
         else:
             selected_keyword = st.text_input(
                 "Enter a keyword:",
+                key="content_brief_keyword_input",
                 placeholder="e.g., best seo tools 2024"
             )
             st.info("💡 Tip: Research keywords in Tab 1 first for better results")
@@ -645,6 +652,7 @@ with tab7:
         # Target audience
         target_audience = st.text_input(
             "Target Audience",
+            key="content_brief_audience_input",
             value="general",
             placeholder="e.g., small business owners, marketing professionals"
         )
@@ -747,6 +755,336 @@ with tab7:
                 mime="application/json"
             )
 
+with tab8:
+    st.markdown("### ✍️ AI Content Generator")
+    st.markdown("Generate SEO-optimized content based on your content brief")
+    
+    # Initialize session state for chat history
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    if 'generated_content' not in st.session_state:
+        st.session_state.generated_content = None
+    
+    # Create two columns for config/chat and content
+    config_col, content_col = st.columns([1, 2])
+    
+    with config_col:
+        st.markdown("#### 📋 Content Configuration")
+        
+        # Check if content brief exists
+        has_brief = 'content_brief' in st.session_state and st.session_state.content_brief
+        
+        if has_brief:
+            st.success(f"📝 Using brief for: {st.session_state.content_brief['keyword']}")
+        else:
+            st.warning("💡 Generate a content brief in Tab 7 first for better results")
+        
+        # Content Type Selection
+        content_type = st.selectbox(
+            "Content Type",
+            options=["Blog Post", "Landing Page", "Product Page", "Guide/Tutorial", "Comparison Article"],
+            help="Select the type of content to generate"
+        )
+        
+        # Target Audience
+        default_audience = st.session_state.content_brief.get('audience', 'general') if has_brief else 'general'
+        target_audience = st.text_input(
+            "Target Audience",
+            key="content_generator_audience_input",
+            value=default_audience,
+            placeholder="e.g., small business owners, marketing professionals"
+        )
+        
+        # Title Selection
+        st.markdown("#### 📌 Content Title")
+        title_options = []
+        
+        if has_brief and st.session_state.content_brief.get('brief'):
+            # Extract title suggestions from brief
+            brief_text = st.session_state.content_brief['brief']
+            lines = brief_text.split('\n')
+            for i, line in enumerate(lines):
+                if 'title' in line.lower() and i + 1 < len(lines):
+                    # Look for the next 3 lines after "title" mention
+                    for j in range(1, min(4, len(lines) - i)):
+                        next_line = lines[i + j].strip()
+                        if next_line and not next_line.startswith('#'):
+                            title_options.append(next_line.lstrip('- •123. '))
+        
+        if title_options:
+            title_options.append("Custom Title")
+            selected_title_option = st.selectbox("Select Title", title_options)
+            
+            if selected_title_option == "Custom Title":
+                title = st.text_input("Enter Custom Title", key="custom_title_input", placeholder="Enter your title")
+            else:
+                title = selected_title_option
+        else:
+            title = st.text_input(
+                "Content Title",
+                key="content_generator_title_input",
+                placeholder="Enter a compelling title for your content"
+            )
+        
+        # Word Count
+        word_count = st.slider(
+            "Target Word Count",
+            min_value=500,
+            max_value=4000,
+            value=1500,
+            step=100,
+            help="Approximate word count for the content"
+        )
+        
+        # MCP Research Toggle
+        use_mcp = st.checkbox(
+            "🔍 Use Real-time SEO Data",
+            value=True,
+            help="Enhance content with current SERP and keyword data"
+        )
+        
+        # Chat Interface
+        st.markdown("#### 💬 Refinement Chat")
+        
+        # Display chat history
+        chat_container = st.container()
+        with chat_container:
+            for msg in st.session_state.chat_history[-5:]:  # Show last 5 messages
+                if msg['role'] == 'user':
+                    st.info(f"You: {msg['content']}")
+                else:
+                    st.success(f"AI: {msg['content']}")
+        
+        # Chat input
+        user_input = st.text_area(
+            "Additional instructions or refinements:",
+            key="content_generator_chat_input",
+            placeholder="e.g., 'Add more statistics', 'Make it more conversational', 'Include case studies'",
+            height=100
+        )
+        
+        # Action buttons
+        button_col1, button_col2 = st.columns(2)
+        
+        with button_col1:
+            if st.button("🚀 Generate Content", type="primary", disabled=not title):
+                if title:
+                    with st.spinner("✨ Generating content with AI..."):
+                        try:
+                            # Import the content generator
+                            from agents.content_generator import ContentGeneratorAgent
+                            generator = ContentGeneratorAgent()
+                            
+                            # Add user input to chat history if provided
+                            if user_input:
+                                st.session_state.chat_history.append({
+                                    'role': 'user',
+                                    'content': user_input
+                                })
+                            
+                            # Get content brief
+                            content_brief = st.session_state.content_brief if has_brief else {
+                                'keyword': title,
+                                'brief': f"Create {content_type} about {title}"
+                            }
+                            
+                            # Generate content
+                            result = generator.generate_content(
+                                content_brief=content_brief,
+                                content_type=content_type,
+                                target_audience=target_audience,
+                                title=title,
+                                word_count=word_count,
+                                chat_history=st.session_state.chat_history,
+                                use_mcp_research=use_mcp
+                            )
+                            
+                            st.session_state.generated_content = result
+                            
+                            # Add AI response to chat
+                            st.session_state.chat_history.append({
+                                'role': 'assistant',
+                                'content': f"Generated {result['metadata'].get('word_count', 0)} words of {content_type} content."
+                            })
+                            
+                            st.success("✅ Content generated successfully!")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Generation error: {str(e)}")
+                else:
+                    st.warning("Please enter a title")
+        
+        with button_col2:
+            if st.button("🔄 Refine Content") and st.session_state.generated_content and user_input:
+                with st.spinner("🔧 Refining content..."):
+                    try:
+                        from agents.content_generator import ContentGeneratorAgent
+                        generator = ContentGeneratorAgent()
+                        
+                        # Add refinement request to chat
+                        st.session_state.chat_history.append({
+                            'role': 'user',
+                            'content': user_input
+                        })
+                        
+                        # Refine the content
+                        refined_content = generator.refine_content(
+                            current_content=st.session_state.generated_content['content'],
+                            refinement_instruction=user_input,
+                            keyword=st.session_state.content_brief.get('keyword', '') if has_brief else ''
+                        )
+                        
+                        # Update the content
+                        st.session_state.generated_content['content'] = refined_content
+                        st.session_state.generated_content['metadata']['refined'] = True
+                        
+                        # Add AI response
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': "Content refined based on your instructions."
+                        })
+                        
+                        st.success("✅ Content refined!")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Refinement error: {str(e)}")
+        
+        # Clear chat button
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.chat_history = []
+            st.rerun()
+    
+    with content_col:
+        st.markdown("#### 📄 Generated Content")
+        
+        if st.session_state.generated_content:
+            # Display metadata
+            meta = st.session_state.generated_content.get('metadata', {})
+            meta_col1, meta_col2, meta_col3 = st.columns(3)
+            
+            with meta_col1:
+                st.metric("Word Count", meta.get('word_count', 0))
+            with meta_col2:
+                st.metric("Content Type", meta.get('type', 'Unknown'))
+            with meta_col3:
+                research_status = "✅ Yes" if meta.get('research_used') else "❌ No"
+                st.metric("SEO Research", research_status)
+            
+            # Display content in expandable section
+            with st.expander("📝 Full Content", expanded=True):
+                st.markdown(st.session_state.generated_content['content'])
+            
+            # Show research data if available
+            research_data = st.session_state.generated_content.get('research_data', {})
+            if research_data:
+                with st.expander("🔍 Research Data Used"):
+                    if research_data.get('competitor_insights'):
+                        st.markdown("**Competitor Insights:**")
+                        for comp in research_data['competitor_insights']:
+                            st.write(f"• {comp['title']}")
+                    
+                    if research_data.get('related_terms'):
+                        st.markdown("**Related Keywords:**")
+                        st.write(", ".join(research_data['related_terms']))
+                    
+                    if research_data.get('trending'):
+                        st.markdown(f"**Trend Status:** {research_data['trending']}")
+            
+            # Improvement suggestions
+            if st.button("💡 Get Improvement Suggestions"):
+                with st.spinner("Analyzing content..."):
+                    try:
+                        from agents.content_generator import ContentGeneratorAgent
+                        generator = ContentGeneratorAgent()
+                        
+                        suggestions = generator.suggest_improvements(
+                            st.session_state.generated_content['content']
+                        )
+                        
+                        st.markdown("### 💡 Suggested Improvements")
+                        
+                        # Display suggestions in an expandable section
+                        with st.expander("View AI-Powered Content Optimization Suggestions", expanded=True):
+                            if suggestions:
+                                for i, suggestion in enumerate(suggestions, 1):
+                                    # Add icon based on suggestion area
+                                    if 'SEO' in suggestion:
+                                        icon = "🔍"
+                                    elif 'Readability' in suggestion:
+                                        icon = "📖"
+                                    elif 'Structure' in suggestion:
+                                        icon = "🏗️"
+                                    elif 'Call-to-action' in suggestion or 'CTA' in suggestion:
+                                        icon = "🎯"
+                                    elif 'audience' in suggestion.lower():
+                                        icon = "👥"
+                                    else:
+                                        icon = "💡"
+                                    
+                                    st.markdown(f"{icon} **{suggestion}**")
+                                    st.markdown("---")
+                            else:
+                                st.info("No specific suggestions available at this time.")
+                    
+                    except Exception as e:
+                        st.error(f"Error getting suggestions: {str(e)}")
+            
+            # Export options
+            st.markdown("#### 📥 Export Options")
+            export_col1, export_col2, export_col3 = st.columns(3)
+            
+            with export_col1:
+                # Export as Markdown
+                st.download_button(
+                    label="📝 Download Markdown",
+                    data=st.session_state.generated_content['content'],
+                    file_name=f"content_{title.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.md",
+                    mime="text/markdown"
+                )
+            
+            with export_col2:
+                # Export as Text
+                text_content = st.session_state.generated_content['content'].replace('#', '').replace('*', '')
+                st.download_button(
+                    label="📄 Download Text",
+                    data=text_content,
+                    file_name=f"content_{title.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain"
+                )
+            
+            with export_col3:
+                # Export as HTML
+                import markdown
+                html_content = markdown.markdown(st.session_state.generated_content['content'])
+                st.download_button(
+                    label="🌐 Download HTML",
+                    data=html_content,
+                    file_name=f"content_{title.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
+                    mime="text/html"
+                )
+        else:
+            st.info("👆 Configure your content settings and click 'Generate Content' to begin")
+            
+            # Show tips
+            with st.expander("💡 Tips for Better Content"):
+                st.markdown("""
+                **For Best Results:**
+                1. Generate a content brief first (Tab 7) for comprehensive guidance
+                2. Use real-time SEO data for competitive insights
+                3. Be specific with your target audience
+                4. Use the chat to refine and improve the content
+                5. Review improvement suggestions after generation
+                
+                **Content Types:**
+                - **Blog Post:** Informative articles with SEO focus
+                - **Landing Page:** Conversion-focused content
+                - **Product Page:** Feature and benefit-driven content
+                - **Guide/Tutorial:** Step-by-step instructional content
+                - **Comparison Article:** Side-by-side analysis content
+                """)
+
 # Sidebar
 with st.sidebar:
     st.markdown("### 🛠️ Settings")
@@ -768,7 +1106,7 @@ with st.sidebar:
     model = st.selectbox(
         "Select Model",
         options=[
-            "google/gemini-2.0-flash-001",
+            "google/gemini-2.5-flash-lite",
             "anthropic/claude-3-haiku",
             "openai/gpt-4o-mini",
             "meta-llama/llama-3.2-3b-instruct"

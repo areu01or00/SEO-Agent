@@ -104,7 +104,7 @@ DATAFORSEO_PASSWORD=your_password
 
 # OpenRouter LLM Access  
 OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=google/gemini-2.0-flash-001  # or preferred model
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # or preferred model
 ```
 
 ## Troubleshooting Patterns

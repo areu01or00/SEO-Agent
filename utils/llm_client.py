@@ -10,7 +10,7 @@ class LLMClient:
     
     def __init__(self):
         self.api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+        self.model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash-lite")
         self.base_url = "https://openrouter.ai/api/v1"
         
         if not self.api_key:
@@ -244,7 +244,7 @@ class LLMClient:
         except Exception as e:
             # Return default models
             return [
-                "google/gemini-2.0-flash-001",
+                "google/gemini-2.5-flash-lite",
                 "anthropic/claude-3-haiku",
                 "openai/gpt-4o-mini",
                 "meta-llama/llama-3.2-3b-instruct"
