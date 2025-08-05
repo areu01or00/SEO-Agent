@@ -12,26 +12,26 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Install DataForSEO MCP server globally  
-npm install -g dataforseo-mcp-server
-
 # Run the main application
 streamlit run app.py
 ```
 
 ### Development Commands
 ```bash
-# Test keyword research functionality
-python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); print(agent._generate_mock_keywords('seo tools', 100, 70))"
+# Test REST API client directly
+python -c "from utils.dataforseo_client import DataForSEOClient; client = DataForSEOClient(); print('Status:', 'Connected' if not client.use_fallback else 'Mock Mode')"
 
-# Test MCP connection directly
-python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); print(client.get_keyword_suggestions('seo', limit=5))"
+# Test keyword research functionality
+python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); keywords = agent.research_keywords('seo tools', limit=5); print(f'Got {len(keywords)} keywords')"
+
+# Test content generation
+python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=False); print(f'Generated {len(result[\"content\"])} characters')"
 
 # Format code (if black is installed)
-black app.py agents/ utils/ mcp/
+black app.py agents/ utils/
 
 # Lint code (if flake8 is installed)
-flake8 app.py agents/ utils/ mcp/
+flake8 app.py agents/ utils/
 ```
 
 ### Public Demo Commands
@@ -43,9 +43,31 @@ flake8 app.py agents/ utils/ mcp/
 ./start_public_demo_ngrok.sh
 ```
 
-## Architecture Overview
+## Critical Architecture Changes
 
-This is a **Streamlit-based SEO keyword research tool** that integrates DataForSEO API through **Model Context Protocol (MCP)** with AI-powered analysis via OpenRouter LLMs.
+### **MAJOR PIVOT: MCP → REST API Integration**
+
+**Historical Context:**
+- **master_untouched branch**: Contains original MCP-based implementation
+- **master branch**: Current REST API-based implementation (August 2025 pivot)
+
+**Reason for Pivot:**
+- **Streamlit Cloud Incompatibility**: MCP required Node.js ≥20, but Streamlit Cloud only had Node.js v12.22.12
+- **Production Deployment Issues**: MCP server installation failed due to version conflicts and permission issues
+- **Client Requirement**: Needed real DataForSEO data in production, not mock data
+
+**Architecture Evolution:**
+```
+OLD (MCP-based):
+Python App → subprocess → MCP Server (Node.js) → DataForSEO API
+
+NEW (REST-based):
+Python App → Direct HTTP calls → DataForSEO REST API
+```
+
+## Current Architecture Overview
+
+This is a **Streamlit-based SEO keyword research tool** that integrates **directly with DataForSEO REST API** and AI-powered analysis via OpenRouter LLMs.
 
 ### Core Architecture Pattern
 
@@ -54,170 +76,189 @@ Streamlit UI (app.py) → 8 Analysis Tabs
     ↓
 KeywordAgent (agents/keyword_agent.py) 
     ↓
-DataForSEOMCP (mcp/client.py) ← MCP Server Communication
+DataForSEOClient (utils/dataforseo_client.py) ← Direct REST API calls
     ↓
-Enhanced Processing (mcp/enhanced_processing.py) ← Data transformation
+Enhanced Processing ← Real-time data transformation
     ↓
 Results Display + AI Insights (LLMClient via OpenRouter)
     ↓
-ContentGeneratorAgent (agents/content_generator.py) ← Content Generation
+ContentGeneratorAgent (agents/content_generator.py) ← Advanced content generation
 ```
 
 ### Key Design Decisions
 
-1. **MCP Integration**: Uses subprocess communication with official `dataforseo-mcp-server` npm package, NOT direct API calls
-2. **Fallback System**: All MCP calls have mock data fallbacks for development/testing
-3. **Multi-tab Interface**: 8 distinct analysis tabs (Keywords, SERP, Competitors, Trends, Content Analysis, Reports, Content Brief, Content Generator)
+1. **Direct REST API Integration**: Uses standard HTTP requests instead of MCP subprocess communication
+2. **No Mock Data Fallbacks**: All API calls either return real data or fail transparently (removed per client request)
+3. **Multi-tab Interface**: 8 distinct analysis tabs with real DataForSEO data
 4. **AI Enhancement**: LLM-powered insights for keyword clustering, content optimization, and full content generation
-5. **Keyword Preprocessing**: Automatic simplification of long/complex queries for better API results
+5. **Keyword Preprocessing**: Automatic simplification of long/complex queries (>4 words) for better API results
+6. **Streamlit Cloud Optimized**: Works perfectly on Streamlit Cloud without Node.js dependencies
 
 ## Critical Components
 
-### 1. MCP Communication (`mcp/client.py`)
-- **MCPClient**: Generic MCP server communication via stdio
-- **DataForSEOMCP**: Specific DataForSEO MCP integration with full API module support
-- **Key Methods**: Uses official DataForSEO MCP tools like `dataforseo_labs_google_keyword_ideas`, `serp_organic_live_advanced`
-- **Error Handling**: Graceful fallback to mock data when MCP fails
-- **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries (>4 words)
+### 1. REST API Client (`utils/dataforseo_client.py`)
+- **DataForSEOClient**: Direct HTTP integration with DataForSEO v3 API
+- **Authentication**: Basic Auth using username/password (not API key)
+- **Key Methods**: 
+  - `get_keyword_suggestions()`: DataForSEO Labs keyword ideas
+  - `get_serp_analysis()`: Live SERP organic results
+  - `get_search_volume_data()`: Google Ads search volume data
+  - `get_competitor_domains()`: Competitor domain analysis
+  - `get_ranked_keywords()`: Domain ranking keywords
+  - `get_trends_data()`: Google Trends exploration
+  - `analyze_content()`: On-page content analysis
+- **Error Handling**: Transparent failures (no mock fallbacks)
+- **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries
 
-### 2. Data Processing (`mcp/enhanced_processing.py`)
-- **Response Parsing**: Transforms raw DataForSEO JSON into Streamlit-friendly formats
-- **Critical Functions**: 
-  - `process_competitor_data()`: Skips first item (target domain), processes actual competitors
-  - `process_trends_data()`: Handles `values[]` arrays and `date_from` fields from Google Trends
-  - `process_content_analysis_data()`: Processes on-page SEO metrics with error detection
-- **Mock Generators**: Fallback data generators for each analysis type
-
-### 3. AI Integration (`utils/llm_client.py`)
-- **OpenRouter Integration**: Uses OpenRouter API for multi-model LLM access
-- **Model Configuration**: Configurable via `OPENROUTER_MODEL` environment variable
-- **Token Management**: Optimized prompts with specific token limits (1500 for content insights, 800 for suggestions)
-
-### 4. Main Agent (`agents/keyword_agent.py`)
+### 2. Agent Layer (`agents/keyword_agent.py`)
 - **Unified Interface**: Single agent class for all SEO analysis functions
-- **Method Pattern**: Each analysis type has dedicated method (e.g., `research_keywords()`, `analyze_serp()`, `analyze_competitor_domains()`)
-- **Country/Language Mapping**: Converts codes to full names required by DataForSEO MCP
+- **Method Pattern**: Each analysis type has dedicated method with location/language mapping
+- **AI Integration**: Enhanced results with LLM-powered insights
+- **Country/Language Mapping**: Converts codes to full names required by DataForSEO API
 
-### 5. Content Generator (`agents/content_generator.py`)
-- **Advanced Content Creation**: Full content generation with templates for 5 content types
+### 3. Advanced Content Generation (`agents/content_generator.py`)
+- **ContentGeneratorAgent**: Sophisticated content creation with 5 content type templates
 - **MCP Research Integration**: Uses real-time SERP and keyword data for content enhancement
-- **Chat Interface Support**: Handles conversation history and refinement instructions
-- **Improvement Suggestions**: Analyzes generated content across 5 key areas (SEO, readability, structure, CTA, audience)
+- **Chat Interface Support**: Handles conversation history and content refinement
+- **Improvement Suggestions**: AI-powered content analysis across 5 areas (SEO, readability, structure, CTA, audience)
+- **Export Capabilities**: Markdown, Text, and HTML formats
+
+### 4. AI Integration (`utils/llm_client.py`)
+- **OpenRouter Integration**: Multi-model LLM access with configurable models
+- **Model Configuration**: Defaults to `google/gemini-2.5-flash-lite` (August 2025)
+- **Token Management**: Optimized prompts with specific limits (1500 for insights, 800 for suggestions)
+
+### 5. Legacy MCP Components (`mcp/` directory)
+- **Status**: Preserved for reference but NOT used in current implementation
+- **Purpose**: Historical MCP-based integration (see master_untouched branch)
+- **Note**: These files exist but are not imported or used by the current REST implementation
 
 ## Environment Configuration
 
 **Required Environment Variables:**
 ```bash
-# DataForSEO MCP Authentication
+# DataForSEO REST API Authentication (username/password, NOT API key)
 DATAFORSEO_USERNAME=your_username
 DATAFORSEO_PASSWORD=your_password
 
 # OpenRouter LLM Access  
 OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # default model
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # Current default model
 ```
+
+**Streamlit Cloud Specific:**
+```bash
+STREAMLIT_RUNTIME_ENV=cloud  # Optional environment detection
+```
+
+## Data Processing Architecture
+
+### API Response Handling
+- **Keyword Data**: Direct processing of DataForSEO Labs responses
+- **SERP Data**: Real-time Google organic results parsing
+- **Volume Data**: Monthly search data with formatted display (prevents [object Object] issues)
+- **Competitor Data**: Domain intersection and ranking analysis
+- **Content Analysis**: On-page SEO metrics with proper field mapping
+
+### Critical Data Structure Updates
+- **Monthly Searches**: Processes array of objects into readable strings (`"2025-06: 165,000, 2025-05: 135,000"`)
+- **Content Metrics**: Nested structure handling (`content_metrics`, `meta`, `seo_checks`)
+- **Competitor Data**: Proper field mapping for `relevant_serp_items`, `intersections`, `etv`
 
 ## Troubleshooting Patterns
 
-### MCP Connection Issues
-- **Symptom**: "Expecting value: line 1 column 1 (char 0)" errors
-- **Common Causes**: Missing environment variables, incorrect URL formats, DataForSEO API errors
-- **Resolution**: Check processing functions handle empty responses and API error codes
+### REST API Issues
+- **Authentication**: Use username/password, not API key
+- **URL Handling**: Content analysis requires full URLs with protocol
+- **Long Keywords**: Automatically simplified (>4 words → first 4 words) for better results
+- **Monthly Data**: Formatted as readable strings to avoid display issues
 
-### URL Handling
-- **Content Analysis**: Requires full URLs with protocol (`https://domain.com` not `domain.com`)
-- **Competitor Analysis**: Accepts URLs but extracts clean domain names via `extract_domain_from_input()`
+### Streamlit Widget Issues
+- **Unique Keys**: All input widgets have unique keys (e.g., `keyword_research_input`)
+- **Session State**: Content generation uses proper session state management
+- **Data Display**: Handles nested API responses correctly
 
-### Data Processing Edge Cases
-- **Trends Data**: Uses `values[0]` from arrays, skips `missing_data: true` entries
-- **Competitor Data**: First item in results is target domain (should be skipped)
-- **Content Analysis**: Check for `status_code != 20000` and handle API error messages
-- **Long Keywords**: Automatically simplified (>4 words → first 4 words) for better API results
+### Deployment Considerations
+- **No Node.js Required**: Pure Python implementation works on Streamlit Cloud
+- **No Mock Data**: Failures are transparent (client requested removal of fallbacks)
+- **Real Data Only**: All endpoints return actual DataForSEO data or empty results
 
-### Streamlit Widget Keys
-- **All text inputs require unique keys** to avoid duplicate element ID errors
-- **Naming convention**: `{tab_name}_{field}_input` (e.g., `keyword_research_input`)
+## Tab-Specific Implementation
 
-## Testing Notes
+### Tab 1: Keyword Research
+- **API**: `dataforseo_labs_google_keyword_ideas`
+- **Features**: Volume filtering, difficulty scoring, AI clustering
+- **Preprocessing**: Long keywords automatically simplified for better results
 
-The application is designed to work with or without active MCP connections:
-- **With MCP**: Real DataForSEO data via official MCP server
-- **Without MCP**: Mock data generators provide realistic fallback data
-- **Hybrid Mode**: Real data for some endpoints, mock for others based on availability
+### Tab 2: SERP Analysis
+- **API**: `serp_organic_live_advanced`
+- **Features**: Top 10 results, AI gap analysis, competitive insights
+- **Preprocessing**: Query simplification for complex searches
 
-All data processing functions include comprehensive error handling and will gracefully fall back to mock data if MCP responses are malformed or empty.
+### Tab 3: Competitor Analysis
+- **APIs**: `dataforseo_labs_google_competitors_domain`, `dataforseo_labs_google_ranked_keywords`
+- **Features**: Domain discovery, keyword intelligence, intersection analysis
+- **URL Handling**: Automatic domain extraction from full URLs
 
-## Tab-Specific Functionality
+### Tab 4: Trends & Volume
+- **APIs**: `keywords_data_google_ads_search_volume`, `keywords_data_google_trends_explore`
+- **Features**: Historical data, search volume trends, seasonal patterns
+- **Data Processing**: Monthly searches formatted for display, trends data with proper date handling
 
-### Tab 1: Keyword Research (`research_keywords`)
-- **MCP Tool**: `dataforseo_labs_google_keyword_ideas`
-- **Filters**: Min volume, max difficulty
-- **AI Enhancement**: Keyword clustering and content opportunities
-- **Preprocessing**: Long keywords automatically simplified
-
-### Tab 2: SERP Analysis (`analyze_serp`)
-- **MCP Tool**: `serp_organic_live_advanced`
-- **Data**: Top 10 ranking pages
-- **AI Enhancement**: Content gap analysis
-- **Preprocessing**: Long keywords automatically simplified
-
-### Tab 3: Competitor Analysis (`analyze_competitor_domains`, `analyze_competitor_keywords`)
-- **MCP Tools**: `dataforseo_labs_google_competitors_domain`, `dataforseo_labs_google_ranked_keywords`
-- **Features**: Domain discovery + keyword intelligence
-- **URL Handling**: Automatic domain extraction from URLs
-
-### Tab 4: Trends & Volume (`get_search_volume`, `get_trends`)
-- **MCP Tools**: `keywords_data_google_ads_search_volume`, `keywords_data_google_trends_explore`
-- **Time Ranges**: Past hour to 5 years
-- **Preprocessing**: Aggressive simplification for complex queries
-
-### Tab 5: Content Analysis (`analyze_content`)
-- **MCP Tool**: `on_page_instant_pages`
-- **Metrics**: OnPage score, technical SEO, readability
-- **AI Enhancement**: 1500-token optimization recommendations
-- **URL Handling**: Automatic https:// protocol addition
+### Tab 5: Content Analysis
+- **API**: `on_page_instant_pages`
+- **Features**: OnPage scoring, technical SEO analysis, content metrics
+- **Data Structure**: Handles nested response format (no `onpage_result` wrapper)
+- **URL Processing**: Automatic HTTPS addition for bare domains
 
 ### Tab 6: Reports & Analytics
-- **Export**: JSON and Excel with timestamps
-- **Aggregation**: Cross-tab session data
+- **Features**: JSON and Excel export with timestamps
+- **Data**: Aggregated cross-tab session data
 
-### Tab 7: Content Brief (`generate_content_brief`)
-- **AI Tool**: OpenRouter LLM for brief generation
-- **Input**: Keywords from Tab 1 or manual entry, target audience, content type
-- **Output**: Title suggestions, key topics, structure, word count, unique angles, CTAs
+### Tab 7: Content Brief Generation
+- **AI Tool**: OpenRouter LLM integration
+- **Features**: Keyword-based briefs, audience targeting, content structure
 - **Export**: Text and JSON formats
 
-### Tab 8: Content Generator (`generate_content`)
-- **AI Tool**: Advanced content generation with ContentGeneratorAgent
-- **Features**: 5 content templates, MCP research integration, chat interface
+### Tab 8: Advanced Content Generator
+- **Features**: 5 content templates, real-time research integration, chat interface
 - **Content Types**: Blog Post, Landing Page, Product Page, Guide/Tutorial, Comparison Article
-- **Word Count**: 500-4000 words configurable
-- **Refinement**: Chat-based content refinement with session history
-- **Suggestions**: AI-powered improvement suggestions across 5 areas
-- **Export**: Markdown, Text, HTML formats
+- **Advanced**: Word count control (500-4000), refinement chat, improvement suggestions
+- **Export**: Markdown, Text, HTML formats with proper rendering
 
-## Recent Updates
+## Important Implementation Notes
 
-### Keyword Preprocessing Enhancement
-- All major methods now preprocess long keywords (>4 words)
-- `get_keyword_suggestions()`, `get_serp_analysis()`, `get_search_volume_data()`, `get_trends_data()`
-- Prevents zero results for complex queries
+### API Authentication Changes
+- **OLD**: Used `DATAFORSEO_API_KEY` environment variable
+- **NEW**: Uses `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD` for Basic Auth
+- **UI Status**: Fixed to check correct environment variables
 
-### Content Generation System
-- Full ContentGeneratorAgent implementation with sophisticated prompting
-- MCP integration for real-time competitive research
-- Chat interface with conversation history
-- Enhanced suggestion system with 800 token limit and better formatting
+### Content Analysis Evolution
+- **Issue**: Original expected `onpage_result` wrapper that doesn't exist in API
+- **Fix**: Data extracted directly from main response object
+- **Result**: Real metrics (95.24/100 scores, actual word counts, page sizes)
 
-### UI Improvements
-- Fixed Streamlit duplicate element ID errors with unique keys
-- Enhanced suggestion display with icons and expandable sections
-- Better error messages and user feedback
+### Mock Data Removal
+- **Client Request**: Remove all mock/fallback data to ensure transparency
+- **Implementation**: All methods return empty results if API fails
+- **Benefit**: Clear visibility when API issues occur
 
-## Important Reminders
+### Keyword Processing Intelligence
+- **Long Query Handling**: Queries >4 words automatically simplified
+- **Example**: "top 10 cheese burger restaurants in sydney" → "top cheese burger restaurants"
+- **Applied To**: Keyword suggestions, SERP analysis, search volume, trends data
+- **Result**: Better API response rates for complex queries
 
-- **Never use direct DataForSEO API calls** - always use MCP server
-- **Check for existing methods** before creating duplicates (e.g., use `get_serp_analysis()` not `get_serp_data()`)
-- **Test with long keywords** to ensure preprocessing works correctly
-- **Always add unique keys** to Streamlit input widgets
-- **Respect token limits** in LLM calls to prevent response truncation
+## Git Branch Strategy
+
+- **master**: Current production branch with REST API implementation
+- **master_untouched**: Historical MCP-based implementation (preserved for reference)
+- **Deployment**: Use master branch for all deployments (Streamlit Cloud compatible)
+
+## Recent Critical Fixes (August 2025)
+
+1. **Content Analysis Zeros**: Fixed API response parsing for real data display
+2. **Monthly Searches [object Object]**: Implemented proper array-to-string formatting
+3. **API Status Display**: Updated to check correct authentication variables
+4. **Competitor Analysis**: Mapped API response fields correctly
+5. **Mock Data Removal**: Eliminated all fallback data per client requirements
