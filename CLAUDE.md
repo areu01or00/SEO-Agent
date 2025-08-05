@@ -11,63 +11,51 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+npm install
 
-# Run the main application
+# Run the main application locally
 streamlit run app.py
+
+# Run with public URL via LocalTunnel
+./start_public_demo.sh
 ```
 
 ### Development Commands
 ```bash
-# Test REST API client directly
-python -c "from utils.dataforseo_client import DataForSEOClient; client = DataForSEOClient(); print('Status:', 'Connected' if not client.use_fallback else 'Mock Mode')"
+# Test MCP client directly
+python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); print('Status:', 'Connected' if not client.use_fallback else 'Mock Mode')"
 
-# Test keyword research functionality
+# Test keyword research functionality with MCP
 python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); keywords = agent.research_keywords('seo tools', limit=5); print(f'Got {len(keywords)} keywords')"
 
-# Test content generation
-python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=False); print(f'Generated {len(result[\"content\"])} characters')"
+# Test content generation with MCP research
+python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=True); print(f'Generated {len(result[\"content\"])} characters')"
 
 # Format code (if black is installed)
-black app.py agents/ utils/
+black app.py agents/ utils/ mcp/
 
 # Lint code (if flake8 is installed)
-flake8 app.py agents/ utils/
+flake8 app.py agents/ utils/ mcp/
 ```
 
 ### Public Demo Commands
 ```bash
-# Run public demo with LocalTunnel (may have firewall issues)
+# Run public demo with LocalTunnel and MCP integration
 ./start_public_demo.sh
-
-# Alternative: Run public demo with ngrok (more reliable)
-./start_public_demo_ngrok.sh
+# This will give you: https://bmm-seo-tools.loca.lt
 ```
 
-## Critical Architecture Changes
+## Architecture Overview
 
-### **MAJOR PIVOT: MCP → REST API Integration**
+This is a **Streamlit-based SEO keyword research tool** that integrates DataForSEO API through **Model Context Protocol (MCP)** with AI-powered analysis via OpenRouter LLMs.
 
-**Historical Context:**
-- **master_untouched branch**: Contains original MCP-based implementation
-- **master branch**: Current REST API-based implementation (August 2025 pivot)
+### **Current Implementation: MCP-Based Integration**
 
-**Reason for Pivot:**
-- **Streamlit Cloud Incompatibility**: MCP required Node.js ≥20, but Streamlit Cloud only had Node.js v12.22.12
-- **Production Deployment Issues**: MCP server installation failed due to version conflicts and permission issues
-- **Client Requirement**: Needed real DataForSEO data in production, not mock data
-
-**Architecture Evolution:**
-```
-OLD (MCP-based):
-Python App → subprocess → MCP Server (Node.js) → DataForSEO API
-
-NEW (REST-based):
-Python App → Direct HTTP calls → DataForSEO REST API
-```
-
-## Current Architecture Overview
-
-This is a **Streamlit-based SEO keyword research tool** that integrates **directly with DataForSEO REST API** and AI-powered analysis via OpenRouter LLMs.
+**Why MCP:**
+- **Full Control**: Local hosting with Node.js 20+ support
+- **Subprocess Communication**: Direct MCP server integration for reliable DataForSEO access
+- **Public Access**: LocalTunnel provides public URL (https://bmm-seo-tools.loca.lt)
+- **No Platform Limitations**: Self-hosted solution avoids cloud platform restrictions
 
 ### Core Architecture Pattern
 
@@ -76,39 +64,39 @@ Streamlit UI (app.py) → 8 Analysis Tabs
     ↓
 KeywordAgent (agents/keyword_agent.py) 
     ↓
-DataForSEOClient (utils/dataforseo_client.py) ← Direct REST API calls
+DataForSEOMCP (mcp/client.py) ← MCP subprocess communication
     ↓
-Enhanced Processing ← Real-time data transformation
+MCP Server (Node.js) → DataForSEO API → Enhanced Processing
     ↓
 Results Display + AI Insights (LLMClient via OpenRouter)
     ↓
-ContentGeneratorAgent (agents/content_generator.py) ← Advanced content generation
+ContentGeneratorAgent (agents/content_generator.py) ← MCP research integration
 ```
 
 ### Key Design Decisions
 
-1. **Direct REST API Integration**: Uses standard HTTP requests instead of MCP subprocess communication
-2. **No Mock Data Fallbacks**: All API calls either return real data or fail transparently (removed per client request)
+1. **MCP Integration**: Uses subprocess communication with official `dataforseo-mcp-server` npm package
+2. **Fallback System**: All MCP calls have mock data fallbacks for development/testing
 3. **Multi-tab Interface**: 8 distinct analysis tabs with real DataForSEO data
 4. **AI Enhancement**: LLM-powered insights for keyword clustering, content optimization, and full content generation
 5. **Keyword Preprocessing**: Automatic simplification of long/complex queries (>4 words) for better API results
-6. **Streamlit Cloud Optimized**: Works perfectly on Streamlit Cloud without Node.js dependencies
+6. **LocalTunnel Integration**: Public URL access via https://bmm-seo-tools.loca.lt
 
 ## Critical Components
 
-### 1. REST API Client (`utils/dataforseo_client.py`)
-- **DataForSEOClient**: Direct HTTP integration with DataForSEO v3 API
-- **Authentication**: Basic Auth using username/password (not API key)
-- **Key Methods**: 
-  - `get_keyword_suggestions()`: DataForSEO Labs keyword ideas
-  - `get_serp_analysis()`: Live SERP organic results
-  - `get_search_volume_data()`: Google Ads search volume data
-  - `get_competitor_domains()`: Competitor domain analysis
-  - `get_ranked_keywords()`: Domain ranking keywords
-  - `get_trends_data()`: Google Trends exploration
-  - `analyze_content()`: On-page content analysis
-- **Error Handling**: Transparent failures (no mock fallbacks)
-- **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries
+### 1. MCP Communication (`mcp/client.py`)
+- **MCPClient**: Generic MCP server communication via stdio
+- **DataForSEOMCP**: Specific DataForSEO MCP integration with full API module support
+- **Key Methods**: Uses official DataForSEO MCP tools like:
+  - `dataforseo_labs_google_keyword_ideas`: Keyword suggestions
+  - `serp_organic_live_advanced`: Live SERP analysis
+  - `keywords_data_google_ads_search_volume`: Search volume data
+  - `dataforseo_labs_google_competitors_domain`: Competitor analysis
+  - `dataforseo_labs_google_ranked_keywords`: Domain ranking data
+  - `keywords_data_google_trends_explore`: Google Trends data
+  - `on_page_instant_pages`: Content analysis
+- **Error Handling**: Graceful fallback to mock data when MCP fails
+- **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries (>4 words)
 
 ### 2. Agent Layer (`agents/keyword_agent.py`)
 - **Unified Interface**: Single agent class for all SEO analysis functions
@@ -137,19 +125,39 @@ ContentGeneratorAgent (agents/content_generator.py) ← Advanced content generat
 
 **Required Environment Variables:**
 ```bash
-# DataForSEO REST API Authentication (username/password, NOT API key)
+# DataForSEO MCP Authentication
 DATAFORSEO_USERNAME=your_username
 DATAFORSEO_PASSWORD=your_password
 
 # OpenRouter LLM Access  
 OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # Current default model
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # default model
 ```
 
-**Streamlit Cloud Specific:**
+## Public Demo with LocalTunnel
+
+### **Quick Start:**
 ```bash
-STREAMLIT_RUNTIME_ENV=cloud  # Optional environment detection
+./start_public_demo.sh
 ```
+
+**What it does:**
+1. **Sets environment variables** for MCP authentication
+2. **Installs dependencies** (npm packages including dataforseo-mcp-server)
+3. **Starts Streamlit** with MCP integration
+4. **Creates public URL** via LocalTunnel: https://bmm-seo-tools.loca.lt
+
+### **Features:**
+- ✅ **Public Access**: Share URL with anyone worldwide
+- ✅ **Real DataForSEO Data**: Full MCP integration with live API
+- ✅ **All 8 Tabs Working**: Complete functionality
+- ✅ **AI-Powered Insights**: OpenRouter LLM integration
+- ✅ **Custom Subdomain**: Professional URL (bmm-seo-tools.loca.lt)
+
+### **Requirements:**
+- **Node.js 20+**: Required for MCP server (check with `node --version`)
+- **Python 3.x**: For Streamlit application
+- **Internet Connection**: For LocalTunnel and DataForSEO API access
 
 ## Data Processing Architecture
 

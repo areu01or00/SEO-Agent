@@ -1,29 +1,29 @@
 import os
 from typing import List, Dict, Any
 from utils.llm_client import LLMClient
-from utils.dataforseo_client import DataForSEOClient
+from mcp.client import DataForSEOMCP
 import time
 import json
 
 class KeywordAgent:
     """
-    BMM SEO Agent for keyword research using DataForSEO REST API and LLM analysis
+    BMM SEO Agent for keyword research using DataForSEO MCP integration and LLM analysis
     """
     
     def __init__(self):
-        # Initialize REST API client for DataForSEO
-        self.dataforseo_client = DataForSEOClient()
+        # Initialize MCP client for DataForSEO
+        self.dataforseo_mcp = DataForSEOMCP()
         
-        # Keep the MCP name for compatibility but use REST client
-        self.dataforseo_mcp = self.dataforseo_client
+        # Keep compatibility reference
+        self.dataforseo_client = self.dataforseo_mcp
         
         # Initialize LLM client
         self.llm_client = LLMClient()
         
-        if self.dataforseo_client.use_fallback:
-            print("⚠️ Using mock data mode - DataForSEO credentials not configured")
+        if self.dataforseo_mcp.use_fallback:
+            print("⚠️ Using mock data mode - DataForSEO MCP credentials not configured")
         else:
-            print("✅ KeywordAgent initialized with DataForSEO REST API")
+            print("✅ KeywordAgent initialized with DataForSEO MCP integration")
         print("📊 Available capabilities: Keyword Research, SERP Analysis, Competitor Analysis, Content Analysis, Trends")
     
     
