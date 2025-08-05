@@ -7,7 +7,6 @@ import os
 import requests
 import base64
 from typing import List, Dict, Any, Optional
-import random
 
 
 class DataForSEOClient:
@@ -127,10 +126,6 @@ class DataForSEOClient:
             
             return processed_items
         
-        # Use mock data if API failed
-        if self.use_fallback:
-            return self._generate_mock_keyword_data(seed_keyword, limit)
-        
         return []
     
     def get_serp_analysis(
@@ -171,10 +166,6 @@ class DataForSEOClient:
                     })
             
             return processed_items[:10]
-        
-        # Use mock data if API failed
-        if self.use_fallback:
-            return self._generate_mock_serp_data(keyword)
         
         return []
     
@@ -353,70 +344,6 @@ class DataForSEOClient:
                 }
         
         return {"keywords": processed_keywords, "interest_over_time": [], "related_queries": {}}
-    
-    # Mock data methods for fallback mode
-    def _generate_mock_keyword_data(self, seed_keyword: str, limit: int) -> List[Dict[str, Any]]:
-        """Generate realistic mock keyword data"""
-        
-        # Base variations
-        prefixes = ["best", "top", "cheap", "how to", "what is", "where to find", "buy", "compare"]
-        suffixes = ["near me", "online", "reviews", "2024", "guide", "tips", "for beginners", "vs"]
-        
-        keywords = [seed_keyword]  # Include seed keyword
-        
-        # Generate variations
-        for i in range(min(limit - 1, 20)):
-            if random.random() > 0.5:
-                keywords.append(f"{random.choice(prefixes)} {seed_keyword}")
-            else:
-                keywords.append(f"{seed_keyword} {random.choice(suffixes)}")
-        
-        # Generate mock data for each keyword
-        mock_data = []
-        for kw in keywords[:limit]:
-            base_volume = random.randint(100, 50000)
-            mock_data.append({
-                "keyword": kw,
-                "search_volume": base_volume,
-                "competition": random.uniform(0.1, 0.9),
-                "cpc": round(random.uniform(0.5, 5.0), 2),
-                "difficulty": random.randint(20, 80)
-            })
-        
-        return sorted(mock_data, key=lambda x: x["search_volume"], reverse=True)
-    
-    def _generate_mock_serp_data(self, keyword: str) -> List[Dict[str, Any]]:
-        """Generate realistic mock SERP data"""
-        
-        domains = [
-            "example.com", "business.com", "blog.example.org", "news.site.com",
-            "reviews.net", "guide.com", "howto.org", "tips.blog", "expert.site", "resource.org"
-        ]
-        
-        titles = [
-            f"Ultimate Guide to {keyword} - Expert Tips and Tricks",
-            f"Best {keyword} in 2024: Complete Review and Comparison",
-            f"How to Choose the Right {keyword} for Your Needs",
-            f"{keyword}: Everything You Need to Know",
-            f"Top 10 {keyword} Solutions for Businesses",
-            f"{keyword} vs Alternatives: Detailed Comparison",
-            f"The Complete {keyword} Tutorial for Beginners",
-            f"Why {keyword} is Essential for Success",
-            f"{keyword} Best Practices and Common Mistakes",
-            f"Expert Review: {keyword} Features and Benefits"
-        ]
-        
-        mock_serp = []
-        for i in range(10):
-            mock_serp.append({
-                "position": i + 1,
-                "title": titles[i],
-                "url": f"https://{domains[i]}/{keyword.replace(' ', '-').lower()}",
-                "description": f"Comprehensive information about {keyword}. Learn from experts and discover best practices...",
-                "domain": domains[i]
-            })
-        
-        return mock_serp
     
     def analyze_content(
         self,

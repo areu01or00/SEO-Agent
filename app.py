@@ -1091,7 +1091,7 @@ with st.sidebar:
     
     # API Status
     st.markdown("#### API Status")
-    if os.getenv("DATAFORSEO_API_KEY"):
+    if os.getenv("DATAFORSEO_USERNAME") and os.getenv("DATAFORSEO_PASSWORD"):
         st.success("✅ DataForSEO Connected")
     else:
         st.error("❌ DataForSEO Not Connected")
