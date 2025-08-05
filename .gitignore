@@ -1,4 +1,54 @@
-/venv
-**/__pycache__
-/__pycache__
-/.env
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+ENV/
+.Python
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Streamlit secrets - NEVER commit this!
+.streamlit/secrets.toml
+
+# Streamlit config can be committed
+# .streamlit/config.toml is OK to commit
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+data/
+exports/
+*.csv
+*.xlsx
+*.json
+!requirements.txt
+!package.json
+!docker-compose.yml
+!.streamlit/config.toml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Cache
+.cache/
+*.cache
+
+# Logs
+*.log
