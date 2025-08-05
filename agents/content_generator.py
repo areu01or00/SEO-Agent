@@ -259,7 +259,10 @@ class ContentGeneratorAgent:
                 # Check if trending up or down
                 data_points = trends['graph_data']
                 if len(data_points) > 2:
-                    recent_trend = data_points[-1].get('value', 0) - data_points[-3].get('value', 0)
+                    # Safely get values from data points
+                    last_point = data_points[-1] if isinstance(data_points[-1], dict) else {'value': 0}
+                    prev_point = data_points[-3] if isinstance(data_points[-3], dict) else {'value': 0}
+                    recent_trend = last_point.get('value', 0) - prev_point.get('value', 0)
                     research['trending'] = 'up' if recent_trend > 0 else 'stable'
             
         except Exception as e:
