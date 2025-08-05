@@ -127,11 +127,9 @@ class KeywordAgent:
             location = self._get_location_name(country)
             language_name = self._get_language_name(language)
             
-            # Get ranked keywords via MCP
+            # Get ranked keywords via REST API (only accepts domain and limit)
             keywords = self.dataforseo_mcp.get_ranked_keywords(
                 target_domain=target_domain,
-                location=location,
-                language=language_name,
                 limit=limit
             )
             
@@ -159,12 +157,11 @@ class KeywordAgent:
             location = self._get_location_name(country)
             language_name = self._get_language_name(language)
             
-            # Get competitor domains via MCP
+            # Get competitor domains via REST API
             competitors = self.dataforseo_mcp.get_competitor_domains(
                 target_domain=target_domain,
                 location=location,
-                language=language_name,
-                limit=limit
+                language=language_name
             )
             
             print(f"📊 Retrieved {len(competitors)} competitor domains from MCP")

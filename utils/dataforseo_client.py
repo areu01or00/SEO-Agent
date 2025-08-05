@@ -39,8 +39,9 @@ class DataForSEOClient:
             return
             
         try:
+            # Use a simple endpoint to check connection
             response = requests.get(
-                f"{self.base_url}/dataforseo_labs/google/keyword_ideas/live",
+                f"{self.base_url}/appendix/user_data",
                 headers={"Authorization": self.auth_header},
                 timeout=5
             )
@@ -121,7 +122,7 @@ class DataForSEOClient:
                         "search_volume": item["keyword_info"].get("search_volume", 0),
                         "competition": item["keyword_info"].get("competition", 0),
                         "cpc": item["keyword_info"].get("cpc", 0),
-                        "difficulty": int(item["keyword_info"].get("competition", 0) * 100)
+                        "difficulty": int((item["keyword_info"].get("competition") or 0) * 100)
                     })
             
             return processed_items
