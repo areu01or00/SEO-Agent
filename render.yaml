@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: bmm-seo-agent
+    env: python
+    buildCommand: |
+      # Install Node.js 20
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      apt-get install -y nodejs
+      # Install dependencies
+      npm install
+      pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+    envVars:
+      - key: DATAFORSEO_USERNAME
+        value: info@bluemoonmarketing.com.au
+      - key: DATAFORSEO_PASSWORD
+        value: cb4ce318fa940fe7
+      - key: OPENROUTER_API_KEY
+        value: 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
+      - key: OPENROUTER_MODEL
+        value: google/gemini-2.5-flash-lite

@@ -1,0 +1,16 @@
+[providers]
+node = true
+python = true
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "python311", "gcc"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = [
+  "npm install",
+  "pip install -r requirements.txt"
+]
+
+[start]
+cmd = "streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"
