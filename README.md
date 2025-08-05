@@ -22,10 +22,9 @@ pip install -r requirements.txt
 2. **Configure Environment Variables**
 Create a `.env` file with your API credentials:
 ```bash
-# DataForSEO API
+# DataForSEO MCP Authentication
 DATAFORSEO_USERNAME=your_username
 DATAFORSEO_PASSWORD=your_password
-DATAFORSEO_API_KEY=your_api_key
 
 # OpenRouter API
 OPENROUTER_API_KEY=your_openrouter_key

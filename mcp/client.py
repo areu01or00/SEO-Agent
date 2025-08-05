@@ -22,6 +22,33 @@ class MCPClient:
     def configure_dataforseo_server(self):
         """Configure DataForSEO MCP server"""
         try:
+            # Check if running on Streamlit Cloud
+            if os.getenv("STREAMLIT_RUNTIME_ENV") == "cloud":
+                # Try to install MCP server if not already installed
+                try:
+                    subprocess.run(["which", "dataforseo-mcp-server"], check=True, capture_output=True)
+                    print("✅ DataForSEO MCP server already installed")
+                except subprocess.CalledProcessError:
+                    print("📦 Installing DataForSEO MCP server...")
+                    try:
+                        # Install globally without sudo (Streamlit Cloud allows this)
+                        result = subprocess.run(
+                            ["npm", "install", "-g", "dataforseo-mcp-server"],
+                            capture_output=True,
+                            text=True,
+                            timeout=60
+                        )
+                        if result.returncode == 0:
+                            print("✅ DataForSEO MCP server installed successfully")
+                        else:
+                            print(f"❌ Failed to install MCP server: {result.stderr}")
+                            self.use_fallback = True
+                            return False
+                    except Exception as install_error:
+                        print(f"❌ Installation error: {install_error}")
+                        self.use_fallback = True
+                        return False
+            
             # Official DataForSEO MCP server configuration
             self.servers["dataforseo"] = {
                 "command": "dataforseo-mcp-server",
@@ -37,6 +64,7 @@ class MCPClient:
             
         except Exception as e:
             print(f"❌ Failed to configure DataForSEO MCP server: {str(e)}")
+            self.use_fallback = True
             return False
     
     def call_tool(self, server_name: str, tool_name: str, arguments: Dict = None) -> Dict:
@@ -68,14 +96,18 @@ class MCPClient:
             args = server_config["args"]
             
             # Start the MCP server process
-            process = subprocess.Popen(
-                [cmd] + args,
-                env=env,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
+            try:
+                process = subprocess.Popen(
+                    [cmd] + args,
+                    env=env,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+            except FileNotFoundError:
+                print(f"❌ MCP server command '{cmd}' not found. Using fallback mode.")
+                return {"error": f"MCP server '{cmd}' not installed"}
             
             # Send request and get response
             request_json = json.dumps(request) + '\n'
@@ -150,10 +182,14 @@ class DataForSEOMCP:
     
     def __init__(self):
         self.client = MCPClient()
-        self.client.configure_dataforseo_server()
         
         # Try to use real MCP server first, fallback to mock if unavailable
         self.use_fallback = False
+        
+        # Configure server and check if we need fallback
+        if not self.client.configure_dataforseo_server():
+            print("⚠️ Using mock data fallback mode")
+            self.use_fallback = True
         
         # Available API modules based on research
         self.available_modules = {
