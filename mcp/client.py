@@ -23,8 +23,13 @@ class MCPClient:
         """Configure DataForSEO MCP server"""
         try:
             # Official DataForSEO MCP server configuration
+            # Try global installation first, fallback to local
+            mcp_command = "dataforseo-mcp-server"
+            if os.path.exists("./node_modules/.bin/dataforseo-mcp-server"):
+                mcp_command = "./node_modules/.bin/dataforseo-mcp-server"
+            
             self.servers["dataforseo"] = {
-                "command": "dataforseo-mcp-server",
+                "command": mcp_command,
                 "args": [],
                 "env": {
                     "DATAFORSEO_USERNAME": os.getenv("DATAFORSEO_USERNAME"),

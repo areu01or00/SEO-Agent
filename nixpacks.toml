@@ -1,0 +1,15 @@
+[phases.setup]
+nixPkgs = ["nodejs-20_x", "python312"]
+
+[phases.install]
+cmds = [
+    "npm install",
+    "npm install -g dataforseo-mcp-server",
+    "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = ["echo 'Build phase complete'"]
+
+[start]
+cmd = "streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"

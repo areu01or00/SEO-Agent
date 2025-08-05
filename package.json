@@ -1,0 +1,14 @@
+{
+  "name": "bmm-seo-agent",
+  "version": "1.0.0",
+  "description": "BMM SEO Agent with DataForSEO MCP integration",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "dataforseo-mcp-server": "^2.7.2"
+  },
+  "scripts": {
+    "postinstall": "npm install -g dataforseo-mcp-server"
+  }
+}
