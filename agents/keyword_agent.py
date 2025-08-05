@@ -242,8 +242,8 @@ class KeywordAgent:
         try:
             print(f"🔍 Analyzing content for: {url}")
             
-            # Get content analysis via REST API
-            content_data = self.dataforseo_mcp.analyze_content(url=url)
+            # Get content analysis via MCP
+            content_data = self.dataforseo_mcp.get_content_analysis(url=url)
             
             print(f"📊 Retrieved content analysis from MCP")
             

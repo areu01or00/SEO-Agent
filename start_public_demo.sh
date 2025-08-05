@@ -6,7 +6,7 @@ echo "=================================================="
 # Set environment variables for MCP
 export DATAFORSEO_USERNAME="info@bluemoonmarketing.com.au"
 export DATAFORSEO_PASSWORD="cb4ce318fa940fe7"
-export OPENROUTER_API_KEY="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"
+export OPENROUTER_API_KEY="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"
 export OPENROUTER_MODEL="google/gemini-2.5-flash-lite"
 
 echo "✅ Environment variables configured for MCP"
