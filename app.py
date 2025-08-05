@@ -471,29 +471,35 @@ with tab5:
                             st.metric("OnPage Score", f"{content_data.get('onpage_score', 0):.1f}/100")
                         
                         with metrics_col2:
-                            st.metric("Word Count", content_data.get('word_count', 0))
+                            metrics = content_data.get('content_metrics', {})
+                            st.metric("Word Count", metrics.get('word_count', 0))
                         
                         with metrics_col3:
-                            st.metric("Load Time", f"{content_data.get('load_time', 0)}ms")
+                            timing = content_data.get('page_timing', {})
+                            load_time = timing.get('load_time', 0)
+                            st.metric("Load Time", f"{load_time}ms" if isinstance(load_time, (int, float)) else "N/A")
                         
                         with metrics_col4:
-                            st.metric("Page Size", f"{content_data.get('page_size', 0)} bytes")
+                            metrics = content_data.get('content_metrics', {})
+                            st.metric("Page Size", f"{metrics.get('page_size', 0)} bytes")
                         
                         # Additional metrics row
                         metrics2_col1, metrics2_col2, metrics2_col3, metrics2_col4 = st.columns(4)
                         
                         with metrics2_col1:
-                            st.metric("Internal Links", content_data.get('internal_links', 0))
+                            metrics = content_data.get('content_metrics', {})
+                            st.metric("Internal Links", metrics.get('links_count', 0))
                         
                         with metrics2_col2:
-                            st.metric("External Links", content_data.get('external_links', 0))
+                            st.metric("External Links", 0)  # Combined in links_count
                         
                         with metrics2_col3:
-                            st.metric("Images", content_data.get('images', 0))
+                            metrics = content_data.get('content_metrics', {})
+                            st.metric("Images", metrics.get('images_count', 0))
                         
                         with metrics2_col4:
-                            readability = content_data.get('readability', {})
-                            st.metric("Reading Score", f"{readability.get('flesch_kincaid', 0):.1f}")
+                            metrics = content_data.get('content_metrics', {})
+                            st.metric("Reading Score", f"{metrics.get('readability', 0):.1f}")
                         
                         # Content details
                         st.markdown("#### Content Structure")
@@ -501,11 +507,12 @@ with tab5:
                         detail_col1, detail_col2 = st.columns(2)
                         
                         with detail_col1:
+                            meta = content_data.get('meta', {})
                             st.markdown("**Title:**")
-                            st.write(content_data.get('title', 'N/A'))
+                            st.write(meta.get('title', 'N/A'))
                             
                             st.markdown("**Meta Description:**")
-                            st.write(content_data.get('meta_description', 'N/A'))
+                            st.write(meta.get('description', 'N/A'))
                             
                             st.markdown("**H1 Tags:**")
                             for h1 in content_data.get('h1_tags', [])[:3]:
@@ -523,6 +530,7 @@ with tab5:
                         # SEO Checks
                         st.markdown("#### ✅ SEO Checks")
                         seo_checks = content_data.get('seo_checks', {})
+                        api_checks = content_data.get('checks', {})
                         
                         check_col1, check_col2, check_col3, check_col4, check_col5 = st.columns(5)
                         
@@ -539,11 +547,11 @@ with tab5:
                             st.write(f"{status} Meta Desc")
                         
                         with check_col4:
-                            status = "✅" if seo_checks.get('has_favicon') else "❌"
+                            status = "✅" if not api_checks.get('no_favicon', True) else "❌"
                             st.write(f"{status} Favicon")
                         
                         with check_col5:
-                            status = "✅" if seo_checks.get('seo_friendly_url') else "❌"
+                            status = "✅" if api_checks.get('seo_friendly_url', False) else "❌"
                             st.write(f"{status} SEO URL")
                         
                         # AI Insights

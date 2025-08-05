@@ -381,21 +381,36 @@ class DataForSEOClient:
             
             if items:
                 page_data = items[0]
-                onpage_result = page_data.get("onpage_result", {})
+                
+                # Extract data directly from page_data (no onpage_result wrapper)
+                meta_data = page_data.get("meta", {})
                 
                 return {
                     "url": url,
                     "status_code": page_data.get("status_code", 0),
-                    "onpage_score": onpage_result.get("onpage_score", 0),
-                    "meta": onpage_result.get("meta", {}),
-                    "page_timing": onpage_result.get("page_timing", {}),
-                    "checks": onpage_result.get("checks", {}),
+                    "onpage_score": page_data.get("onpage_score", 0),
+                    "meta": {
+                        "title": meta_data.get("title", ""),
+                        "description": meta_data.get("description", ""),
+                        "canonical": meta_data.get("canonical", "")
+                    },
+                    "page_timing": {
+                        "load_time": page_data.get("fetch_time", 0)
+                    },
+                    "checks": page_data.get("checks", {}),
                     "content_metrics": {
-                        "word_count": onpage_result.get("word_count", 0),
-                        "images_count": onpage_result.get("images_count", 0),
-                        "links_count": onpage_result.get("internal_links_count", 0) + 
-                                      onpage_result.get("external_links_count", 0),
-                        "readability": onpage_result.get("flesch_kincaid_readability", 0)
+                        "word_count": page_data.get("total_dom_size", 0),  # Approximation
+                        "images_count": 0,  # Would need content parsing
+                        "links_count": 0,   # Would need content parsing  
+                        "readability": 0,   # Not available in instant_pages
+                        "page_size": page_data.get("size", 0),
+                        "encoded_size": page_data.get("encoded_size", 0)
+                    },
+                    "seo_checks": {
+                        "has_https": url.startswith("https://"),
+                        "has_title": bool(meta_data.get("title")),
+                        "has_description": bool(meta_data.get("description")),
+                        "has_canonical": bool(meta_data.get("canonical"))
                     }
                 }
         
