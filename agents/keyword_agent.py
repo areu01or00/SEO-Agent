@@ -20,10 +20,7 @@ class KeywordAgent:
         # Initialize LLM client
         self.llm_client = LLMClient()
         
-        if self.dataforseo_mcp.use_fallback:
-            print("⚠️ Using mock data mode - DataForSEO MCP credentials not configured")
-        else:
-            print("✅ KeywordAgent initialized with DataForSEO MCP integration")
+        print("✅ KeywordAgent initialized with DataForSEO MCP integration")
         print("📊 Available capabilities: Keyword Research, SERP Analysis, Competitor Analysis, Content Analysis, Trends")
     
     
@@ -72,8 +69,7 @@ class KeywordAgent:
             
         except Exception as e:
             print(f"❌ MCP Error: {str(e)}")
-            # Fallback with mock data for testing
-            return self._generate_mock_keywords(seed_keyword, min_volume, max_difficulty)
+            raise
     
     def analyze_serp(
         self,
@@ -108,8 +104,7 @@ class KeywordAgent:
             
         except Exception as e:
             print(f"❌ SERP MCP Error: {str(e)}")
-            # Fallback with mock data
-            return self._generate_mock_serp(keyword)
+            raise
     
     def analyze_competitor_keywords(
         self,
@@ -412,79 +407,3 @@ class KeywordAgent:
         else:
             return "high"
     
-    def _generate_mock_keywords(self, seed_keyword: str, min_volume: int, max_difficulty: int) -> List[Dict]:
-        """Generate mock keywords for testing/fallback"""
-        import random
-        
-        prefixes = ["best", "top", "cheap", "affordable", "professional", "advanced", "beginner", "free"]
-        suffixes = ["guide", "tutorial", "tips", "tools", "software", "services", "reviews", "comparison"]
-        questions = ["what is", "how to", "why use", "when to use", "where to find"]
-        
-        keywords = []
-        
-        # Related keywords
-        for prefix in prefixes[:3]:
-            keywords.append({
-                "keyword": f"{prefix} {seed_keyword}",
-                "search_volume": random.randint(min_volume, min_volume * 10),
-                "difficulty": random.randint(20, max_difficulty),
-                "cpc": round(random.uniform(0.5, 5.0), 2),
-                "competition": round(random.uniform(0.1, 0.9), 2),
-                "type": "Related",
-                "ai_insight": f"Good opportunity for {prefix} {seed_keyword} content with moderate competition."
-            })
-        
-        # Long-tail keywords
-        for suffix in suffixes[:3]:
-            keywords.append({
-                "keyword": f"{seed_keyword} {suffix} 2024",
-                "search_volume": random.randint(min_volume//2, min_volume * 5),
-                "difficulty": random.randint(10, max_difficulty//2),
-                "cpc": round(random.uniform(0.3, 3.0), 2),
-                "competition": round(random.uniform(0.1, 0.7), 2),
-                "type": "Long-tail",
-                "ai_insight": f"Long-tail opportunity for {suffix} content with lower competition."
-            })
-        
-        # Question keywords
-        for question in questions[:2]:
-            keywords.append({
-                "keyword": f"{question} {seed_keyword}",
-                "search_volume": random.randint(min_volume//3, min_volume * 3),
-                "difficulty": random.randint(15, max_difficulty//2),
-                "cpc": round(random.uniform(0.2, 2.0), 2),
-                "competition": round(random.uniform(0.1, 0.6), 2),
-                "type": "Question",
-                "ai_insight": f"Informational intent for {question} {seed_keyword} queries."
-            })
-        
-        return keywords
-    
-    def _generate_mock_serp(self, keyword: str) -> List[Dict]:
-        """Generate mock SERP results for testing/fallback"""
-        return [
-            {
-                "position": 1,
-                "title": f"Ultimate {keyword} Guide 2024",
-                "url": f"https://example.com/{keyword.replace(' ', '-')}-guide",
-                "description": f"Comprehensive guide covering everything about {keyword}. Learn best practices, tips, and strategies.",
-                "domain": "example.com",
-                "insights": f"Comprehensive content opportunity for {keyword} with focus on practical guides."
-            },
-            {
-                "position": 2,
-                "title": f"Top 10 {keyword} Tools",
-                "url": f"https://besttools.com/{keyword.replace(' ', '-')}-tools",
-                "description": f"Discover the best {keyword} tools available in 2024. Compare features, prices, and reviews.",
-                "domain": "besttools.com",
-                "insights": f"Tool comparison content gap for {keyword} niche."
-            },
-            {
-                "position": 3,
-                "title": f"{keyword} for Beginners",
-                "url": f"https://learn.com/{keyword.replace(' ', '-')}-beginners",
-                "description": f"Start your {keyword} journey with this beginner-friendly tutorial. Step-by-step instructions included.",
-                "domain": "learn.com",
-                "insights": f"Beginner-focused content opportunity in {keyword} space."
-            }
-        ]

@@ -5,9 +5,7 @@ import os
 from typing import Dict, List, Any, Optional
 from .enhanced_processing import (
     process_ranked_keywords_data, process_competitor_data, 
-    process_search_volume_data, process_trends_data, process_content_analysis_data,
-    generate_mock_ranked_keywords, generate_mock_competitor_data,
-    generate_mock_search_volume_data, generate_mock_trends_data, generate_mock_content_analysis
+    process_search_volume_data, process_trends_data, process_content_analysis_data
 )
 
 class MCPClient:
@@ -42,20 +40,25 @@ class MCPClient:
                             print("✅ DataForSEO MCP server installed successfully")
                         else:
                             print(f"❌ Failed to install MCP server: {result.stderr}")
-                            self.use_fallback = True
-                            return False
+                            raise Exception(f"Failed to install MCP server: {result.stderr}")
                     except Exception as install_error:
                         print(f"❌ Installation error: {install_error}")
-                        self.use_fallback = True
-                        return False
+                        raise
+            
+            # Check required environment variables
+            username = os.getenv("DATAFORSEO_USERNAME")
+            password = os.getenv("DATAFORSEO_PASSWORD")
+            
+            if not username or not password:
+                raise Exception("Missing required environment variables: DATAFORSEO_USERNAME and DATAFORSEO_PASSWORD")
             
             # Official DataForSEO MCP server configuration
             self.servers["dataforseo"] = {
                 "command": "dataforseo-mcp-server",
                 "args": [],
                 "env": {
-                    "DATAFORSEO_USERNAME": os.getenv("DATAFORSEO_USERNAME"),
-                    "DATAFORSEO_PASSWORD": os.getenv("DATAFORSEO_PASSWORD")
+                    "DATAFORSEO_USERNAME": username,
+                    "DATAFORSEO_PASSWORD": password
                 }
             }
             
@@ -64,8 +67,7 @@ class MCPClient:
             
         except Exception as e:
             print(f"❌ Failed to configure DataForSEO MCP server: {str(e)}")
-            self.use_fallback = True
-            return False
+            raise
     
     def call_tool(self, server_name: str, tool_name: str, arguments: Dict = None) -> Dict:
         """
@@ -183,13 +185,9 @@ class DataForSEOMCP:
     def __init__(self):
         self.client = MCPClient()
         
-        # Try to use real MCP server first, fallback to mock if unavailable
-        self.use_fallback = False
-        
-        # Configure server and check if we need fallback
+        # Configure MCP server - no fallback
         if not self.client.configure_dataforseo_server():
-            print("⚠️ Using mock data fallback mode")
-            self.use_fallback = True
+            raise Exception("❌ DataForSEO MCP server configuration failed. Please check environment variables and server installation.")
         
         # Available API modules based on research
         self.available_modules = {
@@ -218,28 +216,26 @@ class DataForSEOMCP:
                 processed_keyword = self._simplify_keywords([seed_keyword])[0]
                 print(f"🔑 Simplified keyword query: '{seed_keyword}' → '{processed_keyword}'")
             
-            # Try MCP first
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "dataforseo_labs_google_keyword_ideas",
-                    {
-                        "keywords": [processed_keyword],
-                        "location_name": location,
-                        "language_code": language.lower()[:2],
-                        "limit": limit
-                    }
-                )
-                
-                if not result.get("error"):
-                    return self._process_keyword_data(result)
+            # Call MCP server
+            result = self.client.call_tool(
+                "dataforseo",
+                "dataforseo_labs_google_keyword_ideas",
+                {
+                    "keywords": [processed_keyword],
+                    "location_name": location,
+                    "language_code": language.lower()[:2],
+                    "limit": limit
+                }
+            )
             
-            # Fallback to mock data for development
-            return self._generate_mock_keyword_data(seed_keyword, limit)
+            if result.get("error"):
+                raise Exception(f"MCP keyword suggestions failed: {result['error']}")
+            
+            return self._process_keyword_data(result)
             
         except Exception as e:
             print(f"MCP keyword suggestions failed: {str(e)}")
-            return self._generate_mock_keyword_data(seed_keyword, limit)
+            raise
     
     def get_serp_analysis(
         self,
@@ -256,28 +252,26 @@ class DataForSEOMCP:
                 processed_keyword = self._simplify_keywords([keyword])[0]
                 print(f"🔍 Simplified SERP query: '{keyword}' → '{processed_keyword}'")
             
-            # Try MCP first
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "serp_organic_live_advanced",
-                    {
-                        "keyword": processed_keyword,
-                        "location_name": location,
-                        "language_code": language.lower()[:2],
-                        "depth": 10
-                    }
-                )
-                
-                if not result.get("error"):
-                    return self._process_serp_data(result)
+            # Call MCP server
+            result = self.client.call_tool(
+                "dataforseo",
+                "serp_organic_live_advanced",
+                {
+                    "keyword": processed_keyword,
+                    "location_name": location,
+                    "language_code": language.lower()[:2],
+                    "depth": 10
+                }
+            )
             
-            # Fallback to mock data
-            return self._generate_mock_serp_data(keyword)
+            if result.get("error"):
+                raise Exception(f"MCP SERP analysis failed: {result['error']}")
+            
+            return self._process_serp_data(result)
             
         except Exception as e:
             print(f"MCP SERP analysis failed: {str(e)}")
-            return self._generate_mock_serp_data(keyword)
+            raise
     
     def get_ranked_keywords(
         self,
@@ -289,26 +283,25 @@ class DataForSEOMCP:
         """Get keywords that a domain is ranking for"""
         
         try:
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "dataforseo_labs_google_ranked_keywords",
-                    {
-                        "target": target_domain,
-                        "location_name": location,
-                        "language_code": language.lower()[:2],
-                        "limit": limit
-                    }
-                )
-                
-                if not result.get("error"):
-                    return process_ranked_keywords_data(result)
+            result = self.client.call_tool(
+                "dataforseo",
+                "dataforseo_labs_google_ranked_keywords",
+                {
+                    "target": target_domain,
+                    "location_name": location,
+                    "language_code": language.lower()[:2],
+                    "limit": limit
+                }
+            )
             
-            return generate_mock_ranked_keywords(target_domain, limit)
+            if result.get("error"):
+                raise Exception(f"MCP ranked keywords failed: {result['error']}")
+            
+            return process_ranked_keywords_data(result)
             
         except Exception as e:
             print(f"MCP ranked keywords failed: {str(e)}")
-            return generate_mock_ranked_keywords(target_domain, limit)
+            raise
     
     def get_competitor_domains(
         self,
@@ -320,26 +313,25 @@ class DataForSEOMCP:
         """Get competitor domains for a target domain"""
         
         try:
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "dataforseo_labs_google_competitors_domain",
-                    {
-                        "target": target_domain,
-                        "location_name": location,
-                        "language_code": language.lower()[:2],
-                        "limit": limit
-                    }
-                )
-                
-                if not result.get("error"):
-                    return process_competitor_data(result)
+            result = self.client.call_tool(
+                "dataforseo",
+                "dataforseo_labs_google_competitors_domain",
+                {
+                    "target": target_domain,
+                    "location_name": location,
+                    "language_code": language.lower()[:2],
+                    "limit": limit
+                }
+            )
             
-            return generate_mock_competitor_data(target_domain, limit)
+            if result.get("error"):
+                raise Exception(f"MCP competitor analysis failed: {result['error']}")
+            
+            return process_competitor_data(result)
             
         except Exception as e:
             print(f"MCP competitor analysis failed: {str(e)}")
-            return generate_mock_competitor_data(target_domain, limit)
+            raise
     
     def _preprocess_keywords(self, keywords: List[str]) -> List[str]:
         """Preprocess keywords for better API results"""
@@ -378,30 +370,29 @@ class DataForSEOMCP:
             # Preprocess long/complex keywords
             processed_keywords = self._preprocess_keywords(keywords)
             
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "keywords_data_google_ads_search_volume",
-                    {
-                        "keywords": processed_keywords,
-                        "location_name": location,
-                        "language_code": language.lower()[:2]
-                    }
-                )
-                
-                if not result.get("error"):
-                    volume_data = process_search_volume_data(result)
-                    # Add warning for zero-volume keywords
-                    for i, vd in enumerate(volume_data):
-                        if vd.get('search_volume', 0) == 0 and len(keywords[i]) > 30:
-                            vd['note'] = 'Query too specific - try shorter keywords'
-                    return volume_data
+            result = self.client.call_tool(
+                "dataforseo",
+                "keywords_data_google_ads_search_volume",
+                {
+                    "keywords": processed_keywords,
+                    "location_name": location,
+                    "language_code": language.lower()[:2]
+                }
+            )
             
-            return generate_mock_search_volume_data(keywords)
+            if result.get("error"):
+                raise Exception(f"MCP search volume failed: {result['error']}")
+            
+            volume_data = process_search_volume_data(result)
+            # Add warning for zero-volume keywords
+            for i, vd in enumerate(volume_data):
+                if vd.get('search_volume', 0) == 0 and len(keywords[i]) > 30:
+                    vd['note'] = 'Query too specific - try shorter keywords'
+            return volume_data
             
         except Exception as e:
             print(f"MCP search volume failed: {str(e)}")
-            return generate_mock_search_volume_data(keywords)
+            raise
     
     def get_trends_data(
         self,
@@ -419,30 +410,29 @@ class DataForSEOMCP:
                 processed_keywords = self._simplify_keywords(processed_keywords)
                 print(f"📈 Simplified query for trends: {processed_keywords}")
             
-            if not self.use_fallback:
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "keywords_data_google_trends_explore",
-                    {
-                        "keywords": processed_keywords,
-                        "location_name": location,
-                        "time_range": time_range,
-                        "type": "web"
-                    }
-                )
-                
-                if not result.get("error"):
-                    trends_data = process_trends_data(result)
-                    # Add note if keyword was simplified
-                    if processed_keywords != keywords:
-                        trends_data['note'] = f'Showing trends for simplified query: {", ".join(processed_keywords)}'
-                    return trends_data
+            result = self.client.call_tool(
+                "dataforseo",
+                "keywords_data_google_trends_explore",
+                {
+                    "keywords": processed_keywords,
+                    "location_name": location,
+                    "time_range": time_range,
+                    "type": "web"
+                }
+            )
             
-            return generate_mock_trends_data(keywords)
+            if result.get("error"):
+                raise Exception(f"MCP trends analysis failed: {result['error']}")
+            
+            trends_data = process_trends_data(result)
+            # Add note if keyword was simplified
+            if processed_keywords != keywords:
+                trends_data['note'] = f'Showing trends for simplified query: {", ".join(processed_keywords)}'
+            return trends_data
             
         except Exception as e:
             print(f"MCP trends analysis failed: {str(e)}")
-            return generate_mock_trends_data(keywords)
+            raise
     
     def get_content_analysis(
         self,
@@ -452,33 +442,32 @@ class DataForSEOMCP:
         """Analyze on-page content of a URL"""
         
         try:
-            if not self.use_fallback:
-                # Ensure URL has proper protocol
-                if not url.startswith(('http://', 'https://')):
-                    url = 'https://' + url
-                
-                result = self.client.call_tool(
-                    "dataforseo",
-                    "on_page_instant_pages",
-                    {
-                        "url": url,
-                        "enable_javascript": enable_javascript
-                    }
-                )
-                
-                if not result.get("error"):
-                    processed_result = process_content_analysis_data(result)
-                    # If processing returns empty dict, use fallback
-                    if processed_result:
-                        return processed_result
-                    else:
-                        print(f"MCP returned empty content analysis for {url}, using fallback")
+            # Ensure URL has proper protocol
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
             
-            return generate_mock_content_analysis(url)
+            result = self.client.call_tool(
+                "dataforseo",
+                "on_page_instant_pages",
+                {
+                    "url": url,
+                    "enable_javascript": enable_javascript
+                }
+            )
+            
+            if result.get("error"):
+                raise Exception(f"MCP content analysis failed: {result['error']}")
+            
+            processed_result = process_content_analysis_data(result)
+            
+            if not processed_result:
+                raise Exception(f"Content analysis returned empty data for {url}")
+            
+            return processed_result
             
         except Exception as e:
             print(f"MCP content analysis failed: {str(e)}")
-            return generate_mock_content_analysis(url)
+            raise
     
     def _process_keyword_data(self, raw_data: Dict) -> List[Dict[str, Any]]:
         """Process raw keyword data from MCP response"""
@@ -596,71 +585,3 @@ class DataForSEOMCP:
         else:
             return "Related"
     
-    def _generate_mock_keyword_data(self, seed_keyword: str, limit: int) -> List[Dict[str, Any]]:
-        """Generate mock keyword data for development/testing"""
-        import random
-        
-        prefixes = ["best", "top", "cheap", "affordable", "professional", "free"]
-        suffixes = ["guide", "tutorial", "tips", "tools", "software", "reviews"]
-        questions = ["what is", "how to", "why use", "when to use"]
-        
-        keywords = []
-        
-        # Add original keyword
-        keywords.append({
-            "keyword": seed_keyword,
-            "search_volume": random.randint(1000, 50000),
-            "difficulty": random.randint(30, 80),
-            "cpc": round(random.uniform(1.0, 10.0), 2),
-            "competition": round(random.uniform(0.3, 0.9), 2),
-            "type": "Generic"
-        })
-        
-        # Generate variations
-        for i in range(min(limit - 1, 20)):
-            if i < 6:  # Prefix variations
-                keyword = f"{prefixes[i % len(prefixes)]} {seed_keyword}"
-                kw_type = "Related"
-            elif i < 12:  # Suffix variations
-                keyword = f"{seed_keyword} {suffixes[i % len(suffixes)]}"
-                kw_type = "Long-tail"
-            else:  # Question variations
-                keyword = f"{questions[i % len(questions)]} {seed_keyword}"
-                kw_type = "Question"
-            
-            keywords.append({
-                "keyword": keyword,
-                "search_volume": random.randint(100, 10000),
-                "difficulty": random.randint(10, 70),
-                "cpc": round(random.uniform(0.5, 5.0), 2),
-                "competition": round(random.uniform(0.1, 0.8), 2),
-                "type": kw_type
-            })
-        
-        return keywords[:limit]
-    
-    def _generate_mock_serp_data(self, keyword: str) -> List[Dict[str, Any]]:
-        """Generate mock SERP data for development/testing"""
-        return [
-            {
-                "position": 1,
-                "title": f"Ultimate {keyword} Guide 2024 - Complete Tutorial",
-                "url": f"https://example.com/{keyword.replace(' ', '-')}-guide",
-                "description": f"Learn everything about {keyword} with our comprehensive guide. Expert tips, strategies, and best practices.",
-                "domain": "example.com"
-            },
-            {
-                "position": 2,
-                "title": f"Top 10 {keyword} Tools & Software (2024 Updated)",
-                "url": f"https://tools.com/best-{keyword.replace(' ', '-')}-tools",
-                "description": f"Discover the best {keyword} tools and software. Compare features, pricing, and user reviews.",
-                "domain": "tools.com"
-            },
-            {
-                "position": 3,
-                "title": f"{keyword} for Beginners: Step-by-Step Tutorial",
-                "url": f"https://learn.com/{keyword.replace(' ', '-')}-beginners",
-                "description": f"Start your {keyword} journey with this beginner-friendly tutorial. Easy to follow instructions.",
-                "domain": "learn.com"
-            }
-        ]

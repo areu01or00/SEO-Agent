@@ -471,35 +471,36 @@ with tab5:
                             st.metric("OnPage Score", f"{content_data.get('onpage_score', 0):.1f}/100")
                         
                         with metrics_col2:
-                            metrics = content_data.get('content_metrics', {})
-                            st.metric("Word Count", metrics.get('word_count', 0))
+                            word_count = content_data.get('word_count', 0)
+                            st.metric("Word Count", word_count)
                         
                         with metrics_col3:
-                            timing = content_data.get('page_timing', {})
-                            load_time = timing.get('load_time', 0)
+                            load_time = content_data.get('load_time', 0)
                             st.metric("Load Time", f"{load_time}ms" if isinstance(load_time, (int, float)) else "N/A")
                         
                         with metrics_col4:
-                            metrics = content_data.get('content_metrics', {})
-                            st.metric("Page Size", f"{metrics.get('page_size', 0)} bytes")
+                            page_size = content_data.get('page_size', 0)
+                            st.metric("Page Size", f"{page_size} bytes")
                         
                         # Additional metrics row
                         metrics2_col1, metrics2_col2, metrics2_col3, metrics2_col4 = st.columns(4)
                         
                         with metrics2_col1:
-                            metrics = content_data.get('content_metrics', {})
-                            st.metric("Internal Links", metrics.get('links_count', 0))
+                            internal_links = content_data.get('internal_links', 0)
+                            st.metric("Internal Links", internal_links)
                         
                         with metrics2_col2:
-                            st.metric("External Links", 0)  # Combined in links_count
+                            external_links = content_data.get('external_links', 0)
+                            st.metric("External Links", external_links)
                         
                         with metrics2_col3:
-                            metrics = content_data.get('content_metrics', {})
-                            st.metric("Images", metrics.get('images_count', 0))
+                            images = content_data.get('images', 0)
+                            st.metric("Images", images)
                         
                         with metrics2_col4:
-                            metrics = content_data.get('content_metrics', {})
-                            st.metric("Reading Score", f"{metrics.get('readability', 0):.1f}")
+                            readability = content_data.get('readability', {})
+                            flesch_score = readability.get('flesch_kincaid', 0)
+                            st.metric("Reading Score", f"{flesch_score:.1f}")
                         
                         # Content details
                         st.markdown("#### Content Structure")

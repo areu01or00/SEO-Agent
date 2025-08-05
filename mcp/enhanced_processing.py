@@ -188,12 +188,13 @@ def process_content_analysis_data(raw_data: Dict) -> Dict[str, Any]:
             except json.JSONDecodeError as json_err:
                 print(f"JSON decode error: {json_err}")
                 print(f"Content text (first 200 chars): {content_text[:200]}")
-                return {}
+                raise Exception(f"Invalid JSON response from MCP: {json_err}")
             
             # Check for API error in parsed data
             if parsed_data.get("status_code") != 20000:
-                print(f"DataForSEO API error: {parsed_data.get('status_message', 'Unknown error')}")
-                return {}
+                error_msg = parsed_data.get('status_message', 'Unknown error')
+                print(f"DataForSEO API error: {error_msg}")
+                raise Exception(f"DataForSEO API error: {error_msg}")
                 
             items = parsed_data.get("items", [])
         else:
@@ -208,6 +209,12 @@ def process_content_analysis_data(raw_data: Dict) -> Dict[str, Any]:
             checks = item.get("checks", {})
             page_timing = item.get("page_timing", {})
             
+            # Extract values
+            word_count = content.get("plain_text_word_count", 0)
+            page_size = item.get("size", 0)  
+            load_time = page_timing.get("duration_time", 0)
+            onpage_score = item.get("onpage_score", 0)
+            
             analysis = {
                 "url": item.get("url", ""),
                 "title": meta.get("title", ""),
@@ -215,14 +222,14 @@ def process_content_analysis_data(raw_data: Dict) -> Dict[str, Any]:
                 "h1_tags": htags.get("h1", []),
                 "h2_tags": htags.get("h2", []),
                 "h3_tags": htags.get("h3", []),
-                "word_count": content.get("plain_text_word_count", 0),
+                "word_count": word_count,
                 "internal_links": meta.get("internal_links_count", 0),
                 "external_links": meta.get("external_links_count", 0),
                 "images": meta.get("images_count", 0),
                 "text_content": content.get("plain_text_size", 0),
-                "onpage_score": item.get("onpage_score", 0),
-                "page_size": item.get("size", 0),
-                "load_time": page_timing.get("duration_time", 0),
+                "onpage_score": onpage_score,
+                "page_size": page_size,
+                "load_time": load_time,
                 "seo_checks": {
                     "has_https": checks.get("is_https", False),
                     "has_title": not checks.get("title_too_short", True),
@@ -249,102 +256,9 @@ def process_content_analysis_data(raw_data: Dict) -> Dict[str, Any]:
             
             return analysis
         
-        return {}
+        raise Exception("No items found in content analysis response")
         
     except (json.JSONDecodeError, KeyError, TypeError) as e:
         print(f"Error processing content analysis data: {e}")
-        return {}
+        raise Exception(f"Content analysis processing failed: {e}")
 
-# Mock data generators for fallback
-def generate_mock_ranked_keywords(domain: str, limit: int) -> List[Dict[str, Any]]:
-    """Generate mock ranked keywords data"""
-    keywords = []
-    base_keywords = ["marketing", "seo", "digital", "content", "strategy", "tools", "analytics", "optimization"]
-    
-    for i in range(min(limit, 20)):
-        keyword = f"{random.choice(base_keywords)} {random.choice(['tips', 'guide', 'tools', 'strategy'])}"
-        keywords.append({
-            "keyword": keyword,
-            "search_volume": random.randint(100, 10000),
-            "difficulty": random.randint(20, 80),
-            "cpc": round(random.uniform(0.5, 5.0), 2),
-            "competition": round(random.uniform(0.1, 0.9), 2),
-            "position": random.randint(1, 10),
-            "url": f"https://{domain}/page{i+1}",
-            "title": f"{keyword.title()} - {domain.title()}",
-            "type": "Ranked"
-        })
-    
-    return keywords
-
-def generate_mock_competitor_data(domain: str, limit: int) -> List[Dict[str, Any]]:
-    """Generate mock competitor data"""
-    competitors = []
-    competitor_domains = ["competitor1.com", "competitor2.com", "rival-site.com", "industry-leader.com", "market-leader.com"]
-    
-    for i in range(min(limit, len(competitor_domains))):
-        competitors.append({
-            "domain": competitor_domains[i],
-            "common_keywords": random.randint(50, 500),
-            "se_keywords": random.randint(1000, 10000),
-            "estimated_traffic": random.randint(5000, 50000),
-            "avg_position": round(random.uniform(5, 25), 1),
-            "visibility": round(random.uniform(0.1, 0.8), 3),
-            "relevance": round(random.uniform(0.5, 1.0), 2)
-        })
-    
-    return competitors
-
-def generate_mock_search_volume_data(keywords: List[str]) -> List[Dict[str, Any]]:
-    """Generate mock search volume data"""
-    results = []
-    
-    for keyword in keywords:
-        results.append({
-            "keyword": keyword,
-            "search_volume": random.randint(100, 50000),
-            "cpc": round(random.uniform(0.3, 8.0), 2),
-            "competition": round(random.uniform(0.1, 0.9), 2),
-            "competition_level": random.choice(["LOW", "MEDIUM", "HIGH"]),
-            "monthly_searches": {
-                f"2024-{i:02d}": random.randint(80, 120) * (random.randint(100, 50000) // 100)
-                for i in range(1, 13)
-            },
-            "categories": [random.randint(10000, 15000) for _ in range(3)]
-        })
-    
-    return results
-
-def generate_mock_trends_data(keywords: List[str]) -> Dict[str, Any]:
-    """Generate mock trends data"""
-    return {
-        "keywords": keywords,
-        "graph_data": [
-            {"date": f"2024-{i:02d}-01", "value": random.randint(40, 100)}
-            for i in range(1, 13)
-        ],
-        "related_queries": [
-            f"{keywords[0] if keywords else 'keyword'} {suffix}"
-            for suffix in ["guide", "tutorial", "tips", "best practices", "tools"]
-        ],
-        "rising_queries": [
-            f"new {keywords[0] if keywords else 'keyword'} {suffix}"
-            for suffix in ["trends", "techniques", "strategies", "methods", "approaches"]
-        ]
-    }
-
-def generate_mock_content_analysis(url: str) -> Dict[str, Any]:
-    """Generate mock content analysis data"""
-    return {
-        "url": url,
-        "title": f"Sample Page Title - {url.split('/')[-1] if '/' in url else url}",
-        "meta_description": "This is a sample meta description for the analyzed page.",
-        "h1_tags": ["Main Heading", "Secondary Heading"],
-        "h2_tags": ["Section 1", "Section 2", "Section 3"],
-        "h3_tags": ["Subsection 1.1", "Subsection 1.2", "Subsection 2.1"],
-        "word_count": random.randint(500, 3000),
-        "internal_links": random.randint(10, 50),
-        "external_links": random.randint(5, 20),
-        "images": random.randint(3, 15),
-        "text_content": random.randint(400, 2500)
-    }
