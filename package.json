@@ -9,6 +9,6 @@
     "dataforseo-mcp-server": "^2.7.2"
   },
   "scripts": {
-    "postinstall": "npm install -g dataforseo-mcp-server"
+    "start": "streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"
   }
 }
