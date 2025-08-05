@@ -199,12 +199,24 @@ class DataForSEOClient:
             processed_items = []
             
             for item in items:
+                # Process monthly searches to avoid [object Object] display
+                monthly_data = item.get("monthly_searches", [])
+                monthly_summary = ""
+                if monthly_data:
+                    # Get last 3 months for summary
+                    recent_months = monthly_data[:3]
+                    monthly_summary = ", ".join([
+                        f"{m['year']}-{m['month']:02d}: {m['search_volume']:,}"
+                        for m in recent_months
+                    ])
+                
                 processed_items.append({
                     "keyword": item.get("keyword", ""),
                     "search_volume": item.get("search_volume", 0),
                     "competition": item.get("competition", 0),
                     "cpc": item.get("cpc", 0),
-                    "monthly_searches": item.get("monthly_searches", [])
+                    "monthly_searches": monthly_summary or "No data",
+                    "monthly_data_raw": monthly_data  # Keep raw data for charts
                 })
             
             return processed_items
