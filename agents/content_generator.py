@@ -4,17 +4,17 @@ Content Generator Agent for creating SEO-optimized content based on briefs
 import os
 from typing import List, Dict, Any, Optional
 from utils.llm_client import LLMClient
-from mcp.client import DataForSEOMCP
+from utils.dataforseo_client import DataForSEOClient
 import json
 
 class ContentGeneratorAgent:
     """
-    Advanced content generation agent with MCP integration for real-time data
+    Advanced content generation agent with REST API integration for real-time data
     """
     
     def __init__(self):
         self.llm_client = LLMClient()
-        self.dataforseo_mcp = DataForSEOMCP()
+        self.dataforseo_mcp = DataForSEOClient()  # Using REST client
         self.content_templates = self._load_content_templates()
         
     def _load_content_templates(self) -> Dict[str, str]:
