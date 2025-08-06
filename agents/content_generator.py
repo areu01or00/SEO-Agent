@@ -198,7 +198,9 @@ class ContentGeneratorAgent:
             )
             
             # Generate content with appropriate token limit
-            max_tokens = min(word_count * 2, 4000)  # Approximate token to word ratio
+            # Increased multiplier from 2 to 2.5 for better word count accuracy
+            # Increased cap from 4000 to 6000 for longer content
+            max_tokens = min(int(word_count * 2.5), 6000)  # Better token to word ratio
             
             generated_content = self.llm_client.generate_text(
                 prompt,
@@ -351,7 +353,7 @@ CONTENT BRIEF:
 
 TITLE: {title}
 
-TARGET WORD COUNT: {word_count} words
+TARGET WORD COUNT: {word_count} words (IMPORTANT: Generate AT LEAST {word_count} words)
 
 {heading_instructions}
 
