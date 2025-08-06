@@ -7,6 +7,7 @@ import json
 import random
 from dotenv import load_dotenv
 from urllib.parse import urlparse
+import time 
 
 # Load environment variables
 load_dotenv()
@@ -1063,6 +1064,7 @@ with tab8:
                             })
                             
                             st.success("✅ Content generated successfully!")
+                            time.sleep(0.5)
                             st.rerun()
                             
                         except Exception as e:
