@@ -467,7 +467,7 @@ TONE & STYLE REQUIREMENTS:
     ) -> str:
         """Refine existing content based on user feedback"""
         
-        word_count_instruction = f"\n\nTARGET WORD COUNT: {target_word_count} words (IMPORTANT: Adjust content to meet this word count)" if target_word_count else ""
+        word_count_instruction = f"\n\nTARGET WORD COUNT: {target_word_count} words\nIMPORTANT: You MUST adjust the content length to be approximately {target_word_count} words. If current content is shorter, expand it. If longer, condense it." if target_word_count else ""
         
         prompt = f"""You are refining existing content based on user feedback.{word_count_instruction}
 
@@ -487,9 +487,17 @@ Please revise the content according to the instruction while:
 
 Provide the refined content:"""
         
+        # Calculate max_tokens based on target word count or current content
+        if target_word_count:
+            # Use target word count with same multiplier as main generation
+            max_tokens = min(int(target_word_count * 2.5), 6000)
+        else:
+            # Fallback to current content length
+            max_tokens = len(current_content.split()) * 2
+        
         refined = self.llm_client.generate_text(
             prompt,
-            max_tokens=len(current_content.split()) * 2,
+            max_tokens=max_tokens,
             temperature=0.5
         )
         
