@@ -1055,7 +1055,9 @@ with tab8:
                             )
                             
                             st.session_state.generated_content = result
-                            # Debug: Log to see if content is actually there
+                            # ALSO store as a separate key that might persist better
+                            st.session_state['content_backup'] = result['content']
+                            st.session_state['metadata_backup'] = result.get('metadata', {})
                             print(f"DEBUG: Content stored, length: {len(result.get('content', ''))}")
                             
                             # Add AI response to chat
@@ -1116,8 +1118,18 @@ with tab8:
     with content_col:
         st.markdown("#### 📄 Generated Content")
         
-        # Try to get content from session state or backup
-        content_to_display = st.session_state.get('generated_content') or st.session_state.get('backup_content')
+        # Try multiple ways to get the content
+        content_to_display = None
+        if 'generated_content' in st.session_state and st.session_state.generated_content:
+            content_to_display = st.session_state.generated_content
+        elif 'content_backup' in st.session_state and st.session_state.content_backup:
+            # Reconstruct from backup
+            content_to_display = {
+                'content': st.session_state.content_backup,
+                'metadata': st.session_state.get('metadata_backup', {}),
+                'research_data': {}
+            }
+        
         if content_to_display:
             # Display metadata
             meta = content_to_display.get('metadata', {})
