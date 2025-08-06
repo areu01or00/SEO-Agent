@@ -20,17 +20,24 @@ def process_ranked_keywords_data(raw_data: Dict) -> List[Dict[str, Any]]:
         for item in items:
             keyword_data = item.get("keyword_data", {})
             keyword_info = keyword_data.get("keyword_info", {})
-            serp_item = item.get("ranked_serp_element", {}).get("serp_item", {})
+            ranked_element = item.get("ranked_serp_element", {})
+            serp_item = ranked_element.get("serp_item", {})
             
             result = {
                 "keyword": keyword_data.get("keyword", ""),
                 "search_volume": keyword_info.get("search_volume", 0),
-                "difficulty": keyword_info.get("keyword_difficulty", 0),
+                "difficulty": ranked_element.get("keyword_difficulty", 0),
                 "cpc": keyword_info.get("cpc", 0.0),
                 "competition": keyword_info.get("competition", 0.0),
                 "position": serp_item.get("rank_absolute", 0),
                 "url": serp_item.get("url", ""),
                 "title": serp_item.get("title", ""),
+                "domain": serp_item.get("domain", ""),
+                "etv": serp_item.get("etv", 0.0),  # Estimated Traffic Value
+                "estimated_paid_traffic_cost": serp_item.get("estimated_paid_traffic_cost", 0.0),
+                "monthly_searches": keyword_info.get("monthly_searches", {}),
+                "rank_group": serp_item.get("rank_group", 0),  # SERP page number
+                "rank_changes": serp_item.get("rank_changes", {}),  # Position changes
                 "type": "Ranked"
             }
             keywords.append(result)

@@ -22,14 +22,14 @@ streamlit run app.py
 
 ### Development Commands
 ```bash
-# Test MCP client directly
-python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); print('Status:', 'Connected' if not client.use_fallback else 'Mock Mode')"
+# Test MCP client directly (requires environment variables)
+DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); result = client.get_content_analysis('https://example.com'); print('MCP Status: Connected -', list(result.keys()))"
 
-# Test keyword research functionality with MCP
-python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); keywords = agent.research_keywords('seo tools', limit=5); print(f'Got {len(keywords)} keywords')"
+# Test keyword research functionality
+DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" OPENROUTER_API_KEY="your_key" python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); keywords = agent.research_keywords('seo tools', limit=5); print(f'Got {len(keywords)} keywords')"
 
-# Test content generation with MCP research
-python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=True); print(f'Generated {len(result[\"content\"])} characters')"
+# Test content generation with real MCP research
+DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" OPENROUTER_API_KEY="your_key" python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=True); print(f'Generated {len(result[\"content\"])} characters')"
 
 # Format code (if black is installed)
 black app.py agents/ utils/ mcp/
@@ -76,8 +76,8 @@ ContentGeneratorAgent (agents/content_generator.py) ← MCP research integration
 ### Key Design Decisions
 
 1. **MCP Integration**: Uses subprocess communication with official `dataforseo-mcp-server` npm package
-2. **Fallback System**: All MCP calls have mock data fallbacks for development/testing
-3. **Multi-tab Interface**: 8 distinct analysis tabs with real DataForSEO data
+2. **No Fallback System**: All mock data removed - failures are transparent, returns empty results or raises exceptions
+3. **Multi-tab Interface**: 8 distinct analysis tabs with real DataForSEO data only
 4. **AI Enhancement**: LLM-powered insights for keyword clustering, content optimization, and full content generation
 5. **Keyword Preprocessing**: Automatic simplification of long/complex queries (>4 words) for better API results
 6. **LocalTunnel Integration**: Public URL access via https://bmm-seo-tools.loca.lt
@@ -95,7 +95,7 @@ ContentGeneratorAgent (agents/content_generator.py) ← MCP research integration
   - `dataforseo_labs_google_ranked_keywords`: Domain ranking data
   - `keywords_data_google_trends_explore`: Google Trends data
   - `on_page_instant_pages`: Content analysis
-- **Error Handling**: Graceful fallback to mock data when MCP fails
+- **Error Handling**: Raises exceptions when MCP fails - no mock data fallbacks
 - **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries (>4 words)
 
 ### 2. Agent Layer (`agents/keyword_agent.py`)
@@ -187,9 +187,10 @@ OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # default model
 - **Data Display**: Handles nested API responses correctly
 
 ### Deployment Considerations
-- **No Node.js Required**: Pure Python implementation works on Streamlit Cloud
-- **No Mock Data**: Failures are transparent (client requested removal of fallbacks)
-- **Real Data Only**: All endpoints return actual DataForSEO data or empty results
+- **Node.js Required**: MCP server needs Node.js 20+ for dataforseo-mcp-server package
+- **No Mock Data**: All fallbacks removed - failures raise exceptions or return empty results
+- **Real Data Only**: All endpoints return actual DataForSEO data or fail transparently
+- **Environment Variables**: Must be set correctly or initialization fails
 
 ## Tab-Specific Implementation
 
@@ -263,10 +264,35 @@ OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # default model
 - **master_untouched**: Historical MCP-based implementation (preserved for reference)
 - **Deployment**: Use master branch for all deployments (Streamlit Cloud compatible)
 
-## Recent Critical Fixes (August 2025)
+## Recent Critical Fixes (Latest Session)
 
-1. **Content Analysis Zeros**: Fixed API response parsing for real data display
-2. **Monthly Searches [object Object]**: Implemented proper array-to-string formatting
-3. **API Status Display**: Updated to check correct authentication variables
-4. **Competitor Analysis**: Mapped API response fields correctly
-5. **Mock Data Removal**: Eliminated all fallback data per client requirements
+### Mock Data Elimination
+- **Issue**: Mock data was masking real API failures and displaying fake results
+- **Fix**: Completely removed all mock data generators and fallback systems
+- **Files Modified**: `mcp/client.py`, `mcp/enhanced_processing.py`, `agents/keyword_agent.py`
+- **Result**: Failures now raise exceptions immediately, ensuring data transparency
+
+### Content Analysis Field Mapping Fix
+- **Issue**: Content analysis showing OnPage Score 93.4 but Word Count/Load Time/Page Size as 0
+- **Root Cause**: Streamlit app was looking for data in wrong nested structure
+- **Fix**: Updated field mappings in `app.py` to match actual MCP response structure:
+  - `content_data.get('word_count')` instead of `content_data.get('content_metrics', {}).get('word_count')`
+  - `content_data.get('load_time')` instead of `content_data.get('page_timing', {}).get('load_time')`
+  - `content_data.get('page_size')` instead of `content_data.get('content_metrics', {}).get('page_size')`
+- **Result**: Now displays real values (Word Count: 26, Load Time: 503ms, Page Size: 1248 bytes)
+
+### MCP Client Error Handling Improvements  
+- **Issue**: `'DataForSEOMCP' object has no attribute 'use_fallback'` error
+- **Fix**: Removed all references to `use_fallback` attribute across codebase
+- **Files Modified**: `mcp/client.py`, `agents/keyword_agent.py`
+- **Result**: Clean initialization without attribute errors
+
+### Environment Variable Validation
+- **Issue**: MCP client failing with "expected str, bytes or os.PathLike object, not NoneType"
+- **Fix**: Added proper validation for required environment variables in `mcp/client.py`
+- **Result**: Clear error messages when credentials are missing instead of cryptic errors
+
+### Content Generator MCP Integration Fix
+- **Issue**: ContentGeneratorAgent still importing old REST client
+- **Fix**: Updated to use MCP client (`from mcp.client import DataForSEOMCP`)
+- **Result**: Content generation now uses real-time MCP research data

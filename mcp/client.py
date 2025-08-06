@@ -53,9 +53,60 @@ class MCPClient:
                 raise Exception("Missing required environment variables: DATAFORSEO_USERNAME and DATAFORSEO_PASSWORD")
             
             # Official DataForSEO MCP server configuration
+            # Try different ways to run the MCP server (Windows compatibility)
+            mcp_command = None
+            
+            # Method 1: Try with npx (works with local install)
+            try:
+                result = subprocess.run(["npx", "--version"], capture_output=True, timeout=2)
+                if result.returncode == 0:
+                    # Check if MCP server is available via npx
+                    result = subprocess.run(["npx", "dataforseo-mcp-server", "--version"], 
+                                         capture_output=True, timeout=5)
+                    if result.returncode == 0:
+                        mcp_command = "npx"
+                        mcp_args = ["dataforseo-mcp-server"]
+                        print("✅ Using npx to run DataForSEO MCP server")
+            except:
+                pass
+            
+            # Method 2: Try direct command (global install)
+            if not mcp_command:
+                try:
+                    result = subprocess.run(["dataforseo-mcp-server", "--version"], 
+                                         capture_output=True, timeout=5)
+                    if result.returncode == 0:
+                        mcp_command = "dataforseo-mcp-server"
+                        mcp_args = []
+                        print("✅ Using global DataForSEO MCP server")
+                except:
+                    pass
+            
+            # Method 3: Try with node_modules/.bin (local install)
+            if not mcp_command:
+                local_bin = os.path.join(os.getcwd(), "node_modules", ".bin", "dataforseo-mcp-server")
+                if os.path.exists(local_bin):
+                    mcp_command = local_bin
+                    mcp_args = []
+                    print(f"✅ Using local MCP server at {local_bin}")
+            
+            # Method 4: Windows-specific global npm path
+            if not mcp_command and os.name == 'nt':
+                npm_prefix = subprocess.run(["npm", "config", "get", "prefix"], 
+                                          capture_output=True, text=True, timeout=5).stdout.strip()
+                global_bin = os.path.join(npm_prefix, "dataforseo-mcp-server.cmd")
+                if os.path.exists(global_bin):
+                    mcp_command = global_bin
+                    mcp_args = []
+                    print(f"✅ Using Windows global MCP server at {global_bin}")
+            
+            if not mcp_command:
+                print("❌ DataForSEO MCP server not found. Please install with: npm install -g dataforseo-mcp-server")
+                raise Exception("DataForSEO MCP server not installed or not in PATH")
+            
             self.servers["dataforseo"] = {
-                "command": "dataforseo-mcp-server",
-                "args": [],
+                "command": mcp_command,
+                "args": mcp_args,
                 "env": {
                     "DATAFORSEO_USERNAME": username,
                     "DATAFORSEO_PASSWORD": password

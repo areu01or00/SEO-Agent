@@ -407,3 +407,179 @@ class KeywordAgent:
         else:
             return "high"
     
+    def analyze_domain_rankings(
+        self,
+        domain: str,
+        country: str = "us",
+        language: str = "en",
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Analyze domain's keyword rankings and traffic
+        
+        Returns comprehensive domain analytics including:
+        - Total keywords ranking
+        - Total estimated traffic 
+        - Position distribution
+        - Top traffic keywords
+        - Quick win opportunities
+        """
+        try:
+            print(f"🔍 Analyzing domain rankings for: {domain}")
+            
+            # Clean domain (remove protocol if present)
+            if domain.startswith(('http://', 'https://')):
+                domain = domain.split('://')[1]
+            if domain.endswith('/'):
+                domain = domain[:-1]
+            
+            # Get country and language names
+            country_name = self._get_location_name(country)
+            language_name = self._get_language_name(language)
+            
+            # Get ranked keywords with traffic data
+            keywords = self.dataforseo_mcp.get_ranked_keywords(
+                target_domain=domain,
+                location=country_name,
+                language=language_name,
+                limit=limit
+            )
+            
+            if not keywords:
+                return {
+                    "domain": domain,
+                    "total_keywords": 0,
+                    "total_traffic": 0,
+                    "avg_position": 0,
+                    "keywords": [],
+                    "overview": {},
+                    "insights": {}
+                }
+            
+            # Calculate metrics
+            total_traffic = sum(kw.get('etv', 0) for kw in keywords)
+            total_search_volume = sum(kw.get('search_volume', 0) for kw in keywords)
+            avg_position = sum(kw.get('position', 0) for kw in keywords) / len(keywords) if keywords else 0
+            
+            # Position distribution
+            position_ranges = {
+                "top_3": [],
+                "top_10": [],
+                "positions_11_20": [],
+                "positions_21_50": [],
+                "positions_50_plus": []
+            }
+            
+            for kw in keywords:
+                pos = kw.get('position', 0)
+                if pos <= 3:
+                    position_ranges["top_3"].append(kw)
+                elif pos <= 10:
+                    position_ranges["top_10"].append(kw)
+                elif pos <= 20:
+                    position_ranges["positions_11_20"].append(kw)
+                elif pos <= 50:
+                    position_ranges["positions_21_50"].append(kw)
+                else:
+                    position_ranges["positions_50_plus"].append(kw)
+            
+            # Sort keywords by traffic value
+            keywords_by_traffic = sorted(keywords, key=lambda x: x.get('etv', 0), reverse=True)
+            
+            # Quick wins (keywords ranking 11-20 with good traffic potential)
+            quick_wins = [
+                kw for kw in position_ranges["positions_11_20"]
+                if kw.get('search_volume', 0) > 100
+            ]
+            quick_wins.sort(key=lambda x: x.get('search_volume', 0), reverse=True)
+            
+            # Prepare response
+            result = {
+                "domain": domain,
+                "total_keywords": len(keywords),
+                "total_traffic": round(total_traffic, 2),
+                "total_search_volume": total_search_volume,
+                "avg_position": round(avg_position, 1),
+                "keywords": keywords,
+                "overview": {
+                    "top_3_count": len(position_ranges["top_3"]),
+                    "top_10_count": len(position_ranges["top_3"]) + len(position_ranges["top_10"]),
+                    "positions_11_20": len(position_ranges["positions_11_20"]),
+                    "positions_21_50": len(position_ranges["positions_21_50"]),
+                    "positions_50_plus": len(position_ranges["positions_50_plus"])
+                },
+                "top_traffic_keywords": keywords_by_traffic[:10],
+                "quick_wins": quick_wins[:10],
+                "position_distribution": position_ranges,
+                "insights": self._generate_domain_insights(
+                    keywords, total_traffic, avg_position, position_ranges
+                )
+            }
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Domain analysis error: {str(e)}")
+            raise
+    
+    def _generate_domain_insights(
+        self, 
+        keywords: List[Dict],
+        total_traffic: float,
+        avg_position: float,
+        position_ranges: Dict
+    ) -> Dict[str, Any]:
+        """Generate AI-powered insights for domain analysis"""
+        try:
+            # Basic insights without AI (in case LLM fails)
+            insights = {
+                "summary": f"Domain ranks for {len(keywords)} keywords with estimated traffic of {total_traffic:.0f} visits/month",
+                "strengths": [],
+                "opportunities": [],
+                "recommendations": []
+            }
+            
+            # Identify strengths
+            if len(position_ranges["top_3"]) > 5:
+                insights["strengths"].append(f"Strong presence with {len(position_ranges['top_3'])} keywords in top 3 positions")
+            
+            if total_traffic > 1000:
+                insights["strengths"].append(f"Healthy traffic flow with {total_traffic:.0f} estimated monthly visits")
+            
+            # Identify opportunities
+            quick_win_count = len(position_ranges["positions_11_20"])
+            if quick_win_count > 0:
+                insights["opportunities"].append(f"{quick_win_count} keywords ranking 11-20 can be pushed to page 1")
+            
+            if avg_position > 20:
+                insights["opportunities"].append("Average position is low - focus on optimization")
+            
+            # Recommendations
+            if len(position_ranges["top_3"]) < 3:
+                insights["recommendations"].append("Focus on moving top 10 keywords to top 3 positions")
+            
+            if quick_win_count > 5:
+                insights["recommendations"].append("Prioritize content optimization for position 11-20 keywords")
+            
+            # Try to get AI insights
+            if self.llm_client:
+                try:
+                    prompt = f"""Analyze this domain's SEO performance:
+                    - Total Keywords: {len(keywords)}
+                    - Estimated Traffic: {total_traffic:.0f} visits/month
+                    - Average Position: {avg_position:.1f}
+                    - Top 3 positions: {len(position_ranges['top_3'])} keywords
+                    - Positions 11-20: {len(position_ranges['positions_11_20'])} keywords
+                    
+                    Provide 3 concise, actionable recommendations to improve traffic. Keep each recommendation under 100 words."""
+                    
+                    ai_insights = self.llm_client.generate_text(prompt, max_tokens=1000, temperature=0.3)
+                    insights["ai_recommendations"] = ai_insights
+                except:
+                    pass  # Fallback to basic insights
+            
+            return insights
+            
+        except Exception as e:
+            print(f"Error generating insights: {e}")
+            return {"summary": "Analysis complete", "recommendations": []}

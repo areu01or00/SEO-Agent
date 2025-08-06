@@ -94,7 +94,7 @@ if 'serp_data' not in st.session_state:
     st.session_state.serp_data = None
 
 # Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "🔑 Keyword Research", 
     "📊 SERP Analysis", 
     "🏆 Competitor Analysis",
@@ -102,7 +102,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🔍 Content Analysis",
     "📋 Reports",
     "📝 Content Brief",
-    "✍️ Content Generator"
+    "✍️ Content Generator",
+    "🌐 Domain Analytics"
 ])
 
 with tab1:
@@ -845,6 +846,148 @@ with tab8:
             help="Approximate word count for the content"
         )
         
+        # Initialize default values for advanced settings
+        tone = "professional"
+        readability = "intermediate"
+        heading_structure = None
+        
+        # Advanced Content Settings
+        with st.expander("🎯 Advanced Content Settings", expanded=False):
+            # Humanization Settings
+            st.markdown("#### 🎨 Content Tone & Style")
+            
+            tone_col1, tone_col2 = st.columns(2)
+            with tone_col1:
+                tone = st.selectbox(
+                    "Writing Tone",
+                    options=["professional", "conversational", "friendly", "expert", "casual", "persuasive"],
+                    index=1,  # Default to conversational
+                    key="content_tone",
+                    help="Choose the tone that best matches your brand voice"
+                )
+            
+            with tone_col2:
+                readability = st.selectbox(
+                    "Readability Level",
+                    options=["simple", "intermediate", "advanced"],
+                    index=1,  # Default to intermediate
+                    key="content_readability",
+                    help="Simple: 8th grade | Intermediate: 10th grade | Advanced: College level"
+                )
+            
+            # Custom Heading Structure
+            st.markdown("#### 📝 Custom Heading Structure")
+            st.info("Control the exact number and keywords for headings in your content")
+            
+            heading_col1, heading_col2, heading_col3 = st.columns(3)
+            
+            with heading_col1:
+                h1_count = st.number_input(
+                    "H1 Headings",
+                    min_value=1,
+                    max_value=1,
+                    value=1,
+                    key="h1_count",
+                    help="Usually just the title (1 H1 per page for SEO)"
+                )
+            
+            with heading_col2:
+                h2_count = st.number_input(
+                    "H2 Sections",
+                    min_value=2,
+                    max_value=10,
+                    value=4,
+                    key="h2_count",
+                    help="Main sections of your content"
+                )
+            
+            with heading_col3:
+                h3_count = st.number_input(
+                    "H3 per H2",
+                    min_value=0,
+                    max_value=5,
+                    value=2,
+                    key="h3_count",
+                    help="Subsections under each H2"
+                )
+            
+            # Keywords for headings
+            h2_keywords_input = st.text_input(
+                "Keywords for H2 Headings (comma-separated)",
+                key="h2_keywords",
+                placeholder="e.g., benefits, features, how to, guide",
+                help="These keywords will be incorporated into H2 headings"
+            )
+            
+            h3_keywords_input = st.text_input(
+                "Keywords for H3 Headings (comma-separated)",
+                key="h3_keywords",
+                placeholder="e.g., tips, examples, best practices, steps",
+                help="These keywords will be incorporated into H3 headings"
+            )
+            
+            # Process heading keywords
+            h2_keywords = [kw.strip() for kw in h2_keywords_input.split(',') if kw.strip()] if h2_keywords_input else []
+            h3_keywords = [kw.strip() for kw in h3_keywords_input.split(',') if kw.strip()] if h3_keywords_input else []
+            
+            # Create heading structure dictionary
+            heading_structure = {
+                "h1_count": h1_count,
+                "h2_count": h2_count,
+                "h3_count": h3_count,
+                "h2_keywords": h2_keywords,
+                "h3_keywords": h3_keywords
+            }
+            
+            # Humanization Options
+            st.markdown("#### ✨ Humanization Features")
+            
+            human_col1, human_col2 = st.columns(2)
+            
+            with human_col1:
+                include_examples = st.checkbox(
+                    "Include Real-World Examples",
+                    value=True,
+                    key="include_examples",
+                    help="Add practical examples and case studies"
+                )
+                
+                use_storytelling = st.checkbox(
+                    "Use Storytelling Elements",
+                    value=True,
+                    key="use_storytelling",
+                    help="Include narratives and personal touches"
+                )
+                
+                add_questions = st.checkbox(
+                    "Add Rhetorical Questions",
+                    value=True,
+                    key="add_questions",
+                    help="Engage readers with thought-provoking questions"
+                )
+            
+            with human_col2:
+                use_contractions = st.checkbox(
+                    "Use Natural Contractions",
+                    value=True,
+                    key="use_contractions",
+                    help="Use it's, don't, you'll for conversational flow"
+                )
+                
+                vary_sentences = st.checkbox(
+                    "Vary Sentence Length",
+                    value=True,
+                    key="vary_sentences",
+                    help="Mix short, medium, and long sentences naturally"
+                )
+                
+                personal_pronouns = st.checkbox(
+                    "Use Personal Pronouns",
+                    value=True,
+                    key="personal_pronouns",
+                    help="Include I, you, we for connection"
+                )
+        
         # MCP Research Toggle
         use_mcp = st.checkbox(
             "🔍 Use Real-time SEO Data",
@@ -897,7 +1040,7 @@ with tab8:
                                 'brief': f"Create {content_type} about {title}"
                             }
                             
-                            # Generate content
+                            # Generate content with advanced settings
                             result = generator.generate_content(
                                 content_brief=content_brief,
                                 content_type=content_type,
@@ -905,7 +1048,10 @@ with tab8:
                                 title=title,
                                 word_count=word_count,
                                 chat_history=st.session_state.chat_history,
-                                use_mcp_research=use_mcp
+                                use_mcp_research=use_mcp,
+                                heading_structure=heading_structure,
+                                tone=tone,
+                                readability_level=readability
                             )
                             
                             st.session_state.generated_content = result
@@ -1093,6 +1239,363 @@ with tab8:
                 - **Guide/Tutorial:** Step-by-step instructional content
                 - **Comparison Article:** Side-by-side analysis content
                 """)
+
+# Tab 9: Domain Analytics & Traffic Tracking
+with tab9:
+    st.header("🌐 Domain Analytics & Traffic Tracking")
+    st.markdown("Track your website's keyword rankings, positions, and estimated traffic")
+    
+    # Input section
+    col1, col2, col3 = st.columns([3, 1, 1])
+    
+    with col1:
+        domain_input = st.text_input(
+            "Enter Domain",
+            placeholder="example.com or https://example.com",
+            key="domain_analytics_input",
+            help="Enter your domain to analyze keyword rankings and traffic"
+        )
+    
+    with col2:
+        country_domain = st.selectbox(
+            "Country",
+            options=["us", "uk", "au", "ca", "in", "de", "fr", "es", "it", "jp"],
+            format_func=lambda x: {"us": "🇺🇸 United States", "uk": "🇬🇧 United Kingdom", 
+                                  "au": "🇦🇺 Australia", "ca": "🇨🇦 Canada", "in": "🇮🇳 India",
+                                  "de": "🇩🇪 Germany", "fr": "🇫🇷 France", "es": "🇪🇸 Spain",
+                                  "it": "🇮🇹 Italy", "jp": "🇯🇵 Japan"}.get(x, x),
+            key="domain_country"
+        )
+    
+    with col3:
+        analyze_domain_btn = st.button("🔍 Analyze Domain", type="primary", key="analyze_domain_btn")
+    
+    # Additional settings
+    with st.expander("⚙️ Advanced Settings"):
+        col1_adv, col2_adv = st.columns(2)
+        with col1_adv:
+            domain_limit = st.number_input(
+                "Max Keywords to Analyze",
+                min_value=10,
+                max_value=500,
+                value=100,
+                step=50,
+                key="domain_limit"
+            )
+        with col2_adv:
+            language_domain = st.selectbox(
+                "Language",
+                options=["en", "es", "fr", "de", "it", "pt", "ru", "ja", "zh"],
+                format_func=lambda x: {"en": "English", "es": "Spanish", "fr": "French",
+                                      "de": "German", "it": "Italian", "pt": "Portuguese",
+                                      "ru": "Russian", "ja": "Japanese", "zh": "Chinese"}.get(x, x),
+                key="domain_language"
+            )
+    
+    # Process domain analysis
+    if analyze_domain_btn and domain_input:
+        with st.spinner(f"🔍 Analyzing domain: {domain_input}..."):
+            try:
+                # Initialize agent
+                from agents.keyword_agent import KeywordAgent
+                agent = KeywordAgent()
+                
+                # Get domain analytics
+                domain_data = agent.analyze_domain_rankings(
+                    domain=domain_input,
+                    country=country_domain,
+                    language=language_domain,
+                    limit=domain_limit
+                )
+                
+                if domain_data and domain_data.get('total_keywords', 0) > 0:
+                    st.success(f"✅ Analysis complete! Found {domain_data['total_keywords']} keywords")
+                    
+                    # Store in session state
+                    st.session_state.domain_data = domain_data
+                    
+                    # Overview Metrics
+                    st.markdown("### 📊 Domain Overview")
+                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                    
+                    with metric_col1:
+                        st.metric(
+                            "Total Keywords",
+                            f"{domain_data['total_keywords']:,}",
+                            help="Total keywords your domain is ranking for"
+                        )
+                    
+                    with metric_col2:
+                        st.metric(
+                            "Est. Monthly Traffic",
+                            f"{domain_data['total_traffic']:,.0f}",
+                            help="Estimated monthly organic traffic from all keywords"
+                        )
+                    
+                    with metric_col3:
+                        st.metric(
+                            "Avg. Position",
+                            f"{domain_data['avg_position']:.1f}",
+                            help="Average ranking position across all keywords"
+                        )
+                    
+                    with metric_col4:
+                        st.metric(
+                            "Total Search Volume",
+                            f"{domain_data['total_search_volume']:,}",
+                            help="Combined monthly search volume for all keywords"
+                        )
+                    
+                    # Position Distribution
+                    st.markdown("### 📈 Position Distribution")
+                    pos_col1, pos_col2, pos_col3, pos_col4, pos_col5 = st.columns(5)
+                    
+                    overview = domain_data.get('overview', {})
+                    with pos_col1:
+                        st.metric("Top 3", overview.get('top_3_count', 0))
+                    with pos_col2:
+                        st.metric("Top 10", overview.get('top_10_count', 0))
+                    with pos_col3:
+                        st.metric("Pos 11-20", overview.get('positions_11_20', 0))
+                    with pos_col4:
+                        st.metric("Pos 21-50", overview.get('positions_21_50', 0))
+                    with pos_col5:
+                        st.metric("Pos 50+", overview.get('positions_50_plus', 0))
+                    
+                    # Create two columns for side-by-side display
+                    left_col, right_col = st.columns(2)
+                    
+                    with left_col:
+                        # Top Traffic Keywords
+                        st.markdown("### 🎯 Top Traffic-Driving Keywords")
+                        top_traffic = domain_data.get('top_traffic_keywords', [])
+                        if top_traffic:
+                            traffic_data = []
+                            for kw in top_traffic[:10]:
+                                traffic_data.append({
+                                    "Keyword": kw.get('keyword', ''),
+                                    "Position": kw.get('position', 0),
+                                    "Est. Traffic": f"{kw.get('etv', 0):.1f}",
+                                    "Volume": f"{kw.get('search_volume', 0):,}",
+                                    "Difficulty": kw.get('difficulty', 0)
+                                })
+                            
+                            traffic_df = pd.DataFrame(traffic_data)
+                            st.dataframe(traffic_df, use_container_width=True, hide_index=True)
+                    
+                    with right_col:
+                        # Quick Wins
+                        st.markdown("### 🚀 Quick Win Opportunities")
+                        st.markdown("*Keywords ranking 11-20 with good traffic potential*")
+                        quick_wins = domain_data.get('quick_wins', [])
+                        if quick_wins:
+                            qw_data = []
+                            for kw in quick_wins[:10]:
+                                qw_data.append({
+                                    "Keyword": kw.get('keyword', ''),
+                                    "Position": kw.get('position', 0),
+                                    "Volume": f"{kw.get('search_volume', 0):,}",
+                                    "Potential": f"+{kw.get('etv', 0):.0f}",
+                                    "Difficulty": kw.get('difficulty', 0)
+                                })
+                            
+                            qw_df = pd.DataFrame(qw_data)
+                            st.dataframe(qw_df, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("No quick win opportunities found (keywords ranking 11-20)")
+                    
+                    # AI Insights
+                    insights = domain_data.get('insights', {})
+                    if insights:
+                        st.markdown("### 💡 SEO Insights & Recommendations")
+                        
+                        # Display insights in columns
+                        insight_col1, insight_col2 = st.columns(2)
+                        
+                        with insight_col1:
+                            if insights.get('strengths'):
+                                st.markdown("**✅ Strengths:**")
+                                for strength in insights['strengths']:
+                                    st.markdown(f"• {strength}")
+                            
+                            if insights.get('opportunities'):
+                                st.markdown("**🎯 Opportunities:**")
+                                for opp in insights['opportunities']:
+                                    st.markdown(f"• {opp}")
+                        
+                        with insight_col2:
+                            if insights.get('recommendations'):
+                                st.markdown("**📋 Recommendations:**")
+                                for rec in insights['recommendations']:
+                                    st.markdown(f"• {rec}")
+                        
+                        # AI recommendations if available
+                        if insights.get('ai_recommendations'):
+                            st.markdown("**🤖 AI-Powered Analysis:**")
+                            # Use an expander for long AI analysis
+                            with st.expander("View Detailed AI Recommendations", expanded=True):
+                                st.markdown(insights['ai_recommendations'])
+                    
+                    # Full Keywords Table
+                    st.markdown("### 📋 All Ranking Keywords")
+                    
+                    # Filtering options
+                    filter_col1, filter_col2, filter_col3 = st.columns(3)
+                    
+                    with filter_col1:
+                        pos_filter = st.selectbox(
+                            "Filter by Position",
+                            ["All", "Top 10", "11-20", "21-50", "50+"],
+                            key="domain_pos_filter"
+                        )
+                    
+                    with filter_col2:
+                        vol_filter = st.number_input(
+                            "Min. Search Volume",
+                            min_value=0,
+                            value=0,
+                            step=100,
+                            key="domain_vol_filter"
+                        )
+                    
+                    with filter_col3:
+                        sort_by = st.selectbox(
+                            "Sort by",
+                            ["Traffic (High to Low)", "Position (Best First)", "Volume (High to Low)", "Keyword (A-Z)"],
+                            key="domain_sort"
+                        )
+                    
+                    # Apply filters
+                    keywords_list = domain_data.get('keywords', [])
+                    filtered_keywords = keywords_list.copy()
+                    
+                    # Position filter
+                    if pos_filter == "Top 10":
+                        filtered_keywords = [k for k in filtered_keywords if k.get('position', 0) <= 10]
+                    elif pos_filter == "11-20":
+                        filtered_keywords = [k for k in filtered_keywords if 11 <= k.get('position', 0) <= 20]
+                    elif pos_filter == "21-50":
+                        filtered_keywords = [k for k in filtered_keywords if 21 <= k.get('position', 0) <= 50]
+                    elif pos_filter == "50+":
+                        filtered_keywords = [k for k in filtered_keywords if k.get('position', 0) > 50]
+                    
+                    # Volume filter
+                    filtered_keywords = [k for k in filtered_keywords if k.get('search_volume', 0) >= vol_filter]
+                    
+                    # Sort
+                    if sort_by == "Traffic (High to Low)":
+                        filtered_keywords.sort(key=lambda x: x.get('etv', 0), reverse=True)
+                    elif sort_by == "Position (Best First)":
+                        filtered_keywords.sort(key=lambda x: x.get('position', 999))
+                    elif sort_by == "Volume (High to Low)":
+                        filtered_keywords.sort(key=lambda x: x.get('search_volume', 0), reverse=True)
+                    else:  # Alphabetical
+                        filtered_keywords.sort(key=lambda x: x.get('keyword', ''))
+                    
+                    # Create DataFrame for display
+                    if filtered_keywords:
+                        display_data = []
+                        for kw in filtered_keywords:
+                            display_data.append({
+                                "Keyword": kw.get('keyword', ''),
+                                "Position": kw.get('position', 0),
+                                "Est. Traffic": f"{kw.get('etv', 0):.1f}",
+                                "Search Volume": f"{kw.get('search_volume', 0):,}",
+                                "CPC": f"${kw.get('cpc', 0):.2f}",
+                                "Difficulty": kw.get('difficulty', 0),
+                                "URL": kw.get('url', '')
+                            })
+                        
+                        results_df = pd.DataFrame(display_data)
+                        
+                        # Display with pagination
+                        st.markdown(f"**Showing {len(filtered_keywords)} keywords**")
+                        st.dataframe(
+                            results_df,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=400
+                        )
+                        
+                        # Export options
+                        st.markdown("### 📥 Export Results")
+                        export_col1, export_col2 = st.columns(2)
+                        
+                        with export_col1:
+                            # CSV export
+                            csv = results_df.to_csv(index=False)
+                            st.download_button(
+                                label="📊 Download CSV",
+                                data=csv,
+                                file_name=f"domain_analytics_{domain_input.replace('.', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                                mime="text/csv"
+                            )
+                        
+                        with export_col2:
+                            # JSON export
+                            json_data = json.dumps(domain_data, indent=2)
+                            st.download_button(
+                                label="📋 Download Full Report (JSON)",
+                                data=json_data,
+                                file_name=f"domain_report_{domain_input.replace('.', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.json",
+                                mime="application/json"
+                            )
+                    else:
+                        st.info("No keywords found matching your filters")
+                    
+                else:
+                    st.warning(f"No ranking data found for {domain_input}. Make sure the domain is correct and has organic rankings.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error analyzing domain: {str(e)}")
+                st.info("Please check your domain and try again. Make sure DataForSEO credentials are configured.")
+    
+    elif analyze_domain_btn:
+        st.warning("Please enter a domain to analyze")
+    
+    else:
+        # Instructions and features
+        st.markdown("""
+        ### 🎯 Features
+        
+        This powerful domain analytics tool provides:
+        
+        **📊 Comprehensive Metrics:**
+        - Total keywords your site ranks for
+        - Estimated monthly organic traffic
+        - Average ranking position
+        - Position distribution analysis
+        
+        **🚀 Traffic Insights:**
+        - Top traffic-driving keywords
+        - Quick win opportunities (keywords close to page 1)
+        - Keyword difficulty analysis
+        - Search volume and CPC data
+        
+        **💡 Smart Recommendations:**
+        - AI-powered SEO insights
+        - Actionable optimization suggestions
+        - Competitive positioning analysis
+        
+        **📥 Export Options:**
+        - CSV export for spreadsheet analysis
+        - JSON export for complete data
+        
+        ### 📖 How to Use
+        
+        1. **Enter your domain** (e.g., example.com)
+        2. **Select country and language** for localized results
+        3. **Click "Analyze Domain"** to get comprehensive insights
+        4. **Review the data** to identify optimization opportunities
+        5. **Export results** for further analysis
+        
+        ### 💡 Pro Tips
+        
+        - **Quick Wins**: Focus on keywords ranking 11-20 for fastest improvements
+        - **Traffic Value**: Sort by ETV to find your most valuable keywords
+        - **Content Gaps**: Keywords with high volume but low rankings are content opportunities
+        - **Regular Monitoring**: Track your progress by analyzing weekly or monthly
+        """)
 
 # Sidebar
 with st.sidebar:

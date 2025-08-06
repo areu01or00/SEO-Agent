@@ -154,7 +154,10 @@ class ContentGeneratorAgent:
         title: str,
         word_count: int,
         chat_history: List[Dict[str, str]] = None,
-        use_mcp_research: bool = True
+        use_mcp_research: bool = True,
+        heading_structure: Dict[str, Any] = None,
+        tone: str = "professional",
+        readability_level: str = "intermediate"
     ) -> Dict[str, Any]:
         """
         Generate comprehensive content based on brief and parameters
@@ -188,7 +191,10 @@ class ContentGeneratorAgent:
                 title,
                 word_count,
                 research_data,
-                chat_history
+                chat_history,
+                heading_structure,
+                tone,
+                readability_level
             )
             
             # Generate content with appropriate token limit
@@ -279,13 +285,34 @@ class ContentGeneratorAgent:
         title: str,
         word_count: int,
         research_data: Dict[str, Any],
-        chat_history: List[Dict[str, str]] = None
+        chat_history: List[Dict[str, str]] = None,
+        heading_structure: Dict[str, Any] = None,
+        tone: str = "professional",
+        readability_level: str = "intermediate"
     ) -> str:
-        """Build sophisticated prompt for content generation"""
+        """Build sophisticated prompt for content generation with custom headings and humanization"""
         
         # Extract brief details
         brief_text = content_brief.get('brief', '')
         keyword = content_brief.get('keyword', '')
+        
+        # Build heading structure instructions
+        heading_instructions = ""
+        if heading_structure:
+            heading_instructions = "\n\nHEADING STRUCTURE REQUIREMENTS:\n"
+            if heading_structure.get('h1_count'):
+                heading_instructions += f"- Use exactly {heading_structure['h1_count']} H1 heading (the title)\n"
+            if heading_structure.get('h2_count'):
+                heading_instructions += f"- Include {heading_structure['h2_count']} H2 sections\n"
+                if heading_structure.get('h2_keywords'):
+                    heading_instructions += f"  Keywords to include in H2s: {', '.join(heading_structure['h2_keywords'])}\n"
+            if heading_structure.get('h3_count'):
+                heading_instructions += f"- Include {heading_structure['h3_count']} H3 subsections per H2 section\n"
+                if heading_structure.get('h3_keywords'):
+                    heading_instructions += f"  Keywords to include in H3s: {', '.join(heading_structure['h3_keywords'])}\n"
+        
+        # Build tone and style instructions
+        tone_instructions = self._get_tone_instructions(tone, readability_level)
         
         # Build research context
         research_context = ""
@@ -309,11 +336,15 @@ class ContentGeneratorAgent:
                 if msg['role'] == 'user':
                     chat_context += f"User: {msg['content']}\n"
         
-        prompt = f"""You are an expert content writer specializing in SEO-optimized, engaging content.
+        prompt = f"""You are an expert content writer specializing in creating humanized, SEO-optimized content.
 
-ROLE: Create a {content_type} that is informative, engaging, and optimized for search engines.
+ROLE: Create a {content_type} that sounds natural, engaging, and human-written while being optimized for search engines.
 
 TARGET AUDIENCE: {target_audience}
+TONE: {tone}
+READABILITY LEVEL: {readability_level}
+
+{tone_instructions}
 
 CONTENT BRIEF:
 {brief_text}
@@ -322,8 +353,7 @@ TITLE: {title}
 
 TARGET WORD COUNT: {word_count} words
 
-CONTENT TYPE STRUCTURE: {content_type}
-{self.content_templates.get(content_type, '')}
+{heading_instructions}
 
 PRIMARY KEYWORD: {keyword}
 
@@ -331,27 +361,69 @@ PRIMARY KEYWORD: {keyword}
 
 {chat_context}
 
-WRITING GUIDELINES:
-1. Write in a conversational yet professional tone appropriate for {target_audience}
-2. Use the primary keyword naturally 3-5 times throughout the content
-3. Include related keywords and semantic variations naturally
-4. Create compelling headers and subheaders
-5. Use short paragraphs (2-3 sentences) for better readability
-6. Include actionable insights and practical examples
-7. Add statistics or data points where relevant (you can use placeholder like [stat needed])
-8. End with a strong call-to-action appropriate for the content type
-9. Maintain approximately {word_count} words
+HUMANIZED WRITING GUIDELINES:
+1. Use a {tone} tone that resonates with {target_audience}
+2. Vary sentence length naturally (mix short, medium, and long sentences)
+3. Include personal insights, analogies, or relatable examples
+4. Use transitional phrases to create flow between paragraphs
+5. Add rhetorical questions to engage readers
+6. Include conversational elements like "you might wonder" or "here's the thing"
+7. Use active voice predominantly (80%+)
+8. Include specific examples and case studies where relevant
+9. Add a personal touch with phrases like "In my experience" or "I've found that"
+10. Use contractions naturally (it's, don't, you'll) for conversational flow
+
+SEO OPTIMIZATION:
+- Use the primary keyword "{keyword}" naturally 3-5 times
+- Include related keywords and semantic variations
+- Optimize headings with relevant keywords
+- Create compelling meta-worthy opening paragraph
+
+CONTENT STRUCTURE:
+- Start with a hook that grabs attention
+- Use the specified heading structure
+- Include bullet points or numbered lists for scannability
+- Add a clear call-to-action at the end
+- Maintain approximately {word_count} words
 
 IMPORTANT:
-- Do NOT use generic filler content
-- Do NOT keyword stuff
-- Focus on providing genuine value to the reader
-- Make the content scannable with proper formatting
-- Use markdown formatting for headers, lists, and emphasis
+- Write like a human expert, not an AI
+- Avoid robotic or formulaic language
+- Don't use obvious AI phrases like "In this article, we will explore"
+- Include natural imperfections like colloquialisms
+- Focus on providing genuine value while maintaining readability
 
-Now, generate the complete {content_type} content:"""
+Now, generate the complete {content_type} content with a natural, human voice:"""
         
         return prompt
+    
+    def _get_tone_instructions(self, tone: str, readability_level: str) -> str:
+        """Get specific instructions for tone and readability"""
+        
+        tone_map = {
+            "professional": "Use industry-appropriate terminology while remaining accessible. Maintain authority without being stuffy.",
+            "conversational": "Write as if having a friendly chat with the reader. Use 'you' and 'your' frequently. Include casual phrases.",
+            "friendly": "Be warm and approachable. Use encouraging language and positive framing. Include personal touches.",
+            "expert": "Demonstrate deep knowledge with confidence. Use technical terms when appropriate but explain complex concepts.",
+            "casual": "Keep it light and easy-going. Use everyday language and relatable examples. Don't be afraid of humor.",
+            "persuasive": "Use compelling arguments and emotional appeals. Include social proof and urgency where appropriate."
+        }
+        
+        readability_map = {
+            "simple": "Use short sentences (10-15 words average). Stick to common words. One idea per paragraph. 8th-grade reading level.",
+            "intermediate": "Mix sentence lengths (15-20 words average). Use some industry terms with context. 10th-grade reading level.",
+            "advanced": "Use sophisticated vocabulary and complex sentence structures where appropriate. College reading level."
+        }
+        
+        instructions = f"""
+TONE & STYLE REQUIREMENTS:
+- Tone: {tone_map.get(tone, tone_map['professional'])}
+- Readability: {readability_map.get(readability_level, readability_map['intermediate'])}
+- Include personal pronouns (I, you, we) to create connection
+- Use storytelling elements where appropriate
+- Add personality without sacrificing professionalism
+"""
+        return instructions
     
     def _post_process_content(self, content: str, content_type: str, title: str) -> str:
         """Post-process generated content for quality and formatting"""
