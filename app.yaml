@@ -1,0 +1,28 @@
+name: bmm-seo-agent
+region: nyc
+services:
+- build_command: npm install -g dataforseo-mcp-server && npm install && pip install -r requirements.txt
+  environment_slug: python-3.11
+  envs:
+  - key: DATAFORSEO_USERNAME
+    scope: RUN_TIME
+    type: SECRET
+  - key: DATAFORSEO_PASSWORD
+    scope: RUN_TIME
+    type: SECRET
+  - key: OPENROUTER_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: OPENROUTER_MODEL
+    scope: RUN_TIME
+    value: google/gemini-2.5-flash-lite
+  github:
+    branch: master
+    deploy_on_push: true
+    repo: areu01or00/SEO-Agent
+  http_port: 8501
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  name: web
+  run_command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+  source_dir: /
