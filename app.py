@@ -1063,15 +1063,7 @@ with tab8:
                             })
                             
                             st.success("✅ Content generated successfully!")
-                            
-                            # Platform-specific handling for DigitalOcean
-                            import os
-                            if os.getenv('DIGITALOCEAN_APP_ID'):
-                                # On DigitalOcean, don't rerun - causes session issues
-                                st.info("👆 Click anywhere or press Tab to see the generated content")
-                            else:
-                                # Local development - rerun works fine
-                                st.rerun()
+                            st.rerun()
                             
                         except Exception as e:
                             st.error(f"Generation error: {str(e)}")
