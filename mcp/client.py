@@ -334,6 +334,10 @@ class DataForSEOMCP:
         """Get keywords that a domain is ranking for"""
         
         try:
+            # Request more data to ensure we get enough results
+            # Some domains may have limited rankings, so we ask for more
+            actual_limit = max(limit * 2, 200)  # Request double or at least 200
+            
             result = self.client.call_tool(
                 "dataforseo",
                 "dataforseo_labs_google_ranked_keywords",
@@ -341,14 +345,16 @@ class DataForSEOMCP:
                     "target": target_domain,
                     "location_name": location,
                     "language_code": language.lower()[:2],
-                    "limit": limit
+                    "limit": actual_limit  # Request more to account for filtering
                 }
             )
             
             if result.get("error"):
                 raise Exception(f"MCP ranked keywords failed: {result['error']}")
             
-            return process_ranked_keywords_data(result)
+            # Process and return only the requested limit
+            processed = process_ranked_keywords_data(result)
+            return processed[:limit] if len(processed) > limit else processed
             
         except Exception as e:
             print(f"MCP ranked keywords failed: {str(e)}")
