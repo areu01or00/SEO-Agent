@@ -1095,14 +1095,20 @@ with tab8:
                             target_word_count=word_count  # Pass the current slider value
                         )
                         
-                        # Update the content
+                        # Update the content and metadata
                         st.session_state.generated_content['content'] = refined_content
                         st.session_state.generated_content['metadata']['refined'] = True
+                        st.session_state.generated_content['metadata']['word_count'] = len(refined_content.split())
                         
-                        # Add AI response
+                        # Also update backup storage for DigitalOcean
+                        st.session_state['content_backup'] = refined_content
+                        st.session_state['metadata_backup'] = st.session_state.generated_content['metadata']
+                        
+                        # Add AI response with updated word count
+                        new_word_count = len(refined_content.split())
                         st.session_state.chat_history.append({
                             'role': 'assistant',
-                            'content': "Content refined based on your instructions."
+                            'content': f"Content refined. New word count: {new_word_count} words."
                         })
                         
                         st.success("✅ Content refined!")
