@@ -342,7 +342,7 @@ with tab3:
                 with st.spinner("🔄 Analyzing competitor keywords..."):
                     try:
                         agent = KeywordAgent()
-                        competitor_keywords = agent.analyze_competitor_keywords(clean_domain, country, language, 20)
+                        competitor_keywords = agent.analyze_competitor_keywords(clean_domain, country, language, 100)  # Increased from 20 to 100
                         
                         if competitor_keywords:
                             st.success(f"✅ Found {len(competitor_keywords)} competitor keywords!")
@@ -1087,11 +1087,12 @@ with tab8:
                             'content': user_input
                         })
                         
-                        # Refine the content
+                        # Refine the content with updated word count
                         refined_content = generator.refine_content(
                             current_content=st.session_state.generated_content['content'],
                             refinement_instruction=user_input,
-                            keyword=st.session_state.content_brief.get('keyword', '') if has_brief else ''
+                            keyword=st.session_state.content_brief.get('keyword', '') if has_brief else '',
+                            target_word_count=word_count  # Pass the current slider value
                         )
                         
                         # Update the content

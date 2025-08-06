@@ -462,11 +462,14 @@ TONE & STYLE REQUIREMENTS:
         self,
         current_content: str,
         refinement_instruction: str,
-        keyword: str = ""
+        keyword: str = "",
+        target_word_count: int = None
     ) -> str:
         """Refine existing content based on user feedback"""
         
-        prompt = f"""You are refining existing content based on user feedback.
+        word_count_instruction = f"\n\nTARGET WORD COUNT: {target_word_count} words (IMPORTANT: Adjust content to meet this word count)" if target_word_count else ""
+        
+        prompt = f"""You are refining existing content based on user feedback.{word_count_instruction}
 
 CURRENT CONTENT:
 {current_content}
