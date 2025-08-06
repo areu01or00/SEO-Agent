@@ -6,293 +6,291 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Running the Application
 ```bash
-# Activate virtual environment (if exists)
+# Activate virtual environment
 source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-npm install
+npm install -g dataforseo-mcp-server  # Global install recommended
+npm install  # Local dependencies
 
-# Run the main application locally
+# Run locally
 streamlit run app.py
 
 # Run with public URL via LocalTunnel
 ./start_public_demo.sh
-```
-
-### Development Commands
-```bash
-# Test MCP client directly (requires environment variables)
-DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); result = client.get_content_analysis('https://example.com'); print('MCP Status: Connected -', list(result.keys()))"
-
-# Test keyword research functionality
-DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" OPENROUTER_API_KEY="your_key" python -c "from agents.keyword_agent import KeywordAgent; agent = KeywordAgent(); keywords = agent.research_keywords('seo tools', limit=5); print(f'Got {len(keywords)} keywords')"
-
-# Test content generation with real MCP research
-DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" OPENROUTER_API_KEY="your_key" python -c "from agents.content_generator import ContentGeneratorAgent; agent = ContentGeneratorAgent(); result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', 'Test Title', 500, use_mcp_research=True); print(f'Generated {len(result[\"content\"])} characters')"
-
-# Format code (if black is installed)
-black app.py agents/ utils/ mcp/
-
-# Lint code (if flake8 is installed)
-flake8 app.py agents/ utils/ mcp/
-```
-
-### Public Demo Commands
-```bash
-# Run public demo with LocalTunnel and MCP integration
-./start_public_demo.sh
 # This will give you: https://bmm-seo-tools.loca.lt
+```
+
+### Testing Commands
+```bash
+# Test MCP client connectivity
+DATAFORSEO_USERNAME="your_username" DATAFORSEO_PASSWORD="your_password" \
+python -c "from mcp.client import DataForSEOMCP; client = DataForSEOMCP(); \
+result = client.get_keyword_suggestions('test', limit=5); print(f'Got {len(result)} keywords')"
+
+# Test competitor keywords (to verify 100 limit works)
+source venv/bin/activate
+python -c "from agents.keyword_agent import KeywordAgent; \
+agent = KeywordAgent(); \
+results = agent.analyze_competitor_keywords('semrush.com', 'us', 'en', 100); \
+print(f'Got {len(results)} keywords')"
+
+# Test content generation with word count
+python -c "from agents.content_generator import ContentGeneratorAgent; \
+agent = ContentGeneratorAgent(); \
+result = agent.generate_content({'keyword': 'seo'}, 'Blog Post', 'marketers', \
+'Test Title', 1500, use_mcp_research=False); \
+print(f'Generated {len(result[\"content\"].split())} words')"
+```
+
+### Deployment Commands
+```bash
+# Push to GitHub (triggers DigitalOcean auto-deploy)
+git add -A
+git commit -m "Your message"
+git push origin master
+
+# Check deployment logs
+# Go to DigitalOcean App Platform dashboard → Runtime Logs
 ```
 
 ## Architecture Overview
 
-This is a **Streamlit-based SEO keyword research tool** that integrates DataForSEO API through **Model Context Protocol (MCP)** with AI-powered analysis via OpenRouter LLMs.
+**Streamlit-based SEO tool** with DataForSEO API integration via MCP (Model Context Protocol) and AI enhancements through OpenRouter.
 
-### **Current Implementation: MCP-Based Integration**
-
-**Why MCP:**
-- **Full Control**: Local hosting with Node.js 20+ support
-- **Subprocess Communication**: Direct MCP server integration for reliable DataForSEO access
-- **Public Access**: LocalTunnel provides public URL (https://bmm-seo-tools.loca.lt)
-- **No Platform Limitations**: Self-hosted solution avoids cloud platform restrictions
-
-### Core Architecture Pattern
-
+### Core Flow
 ```
-Streamlit UI (app.py) → 8 Analysis Tabs
+Streamlit UI (app.py) → 9 Analysis Tabs
     ↓
 KeywordAgent (agents/keyword_agent.py) 
     ↓
-DataForSEOMCP (mcp/client.py) ← MCP subprocess communication
+DataForSEOMCP (mcp/client.py) ← MCP subprocess (npx or direct)
     ↓
-MCP Server (Node.js) → DataForSEO API → Enhanced Processing
+MCP Server (dataforseo-mcp-server) → DataForSEO API
     ↓
-Results Display + AI Insights (LLMClient via OpenRouter)
+Enhanced Processing (mcp/enhanced_processing.py)
     ↓
-ContentGeneratorAgent (agents/content_generator.py) ← MCP research integration
+Results + AI Insights (LLMClient → OpenRouter)
 ```
 
-### Key Design Decisions
+## Critical Implementation Details
 
-1. **MCP Integration**: Uses subprocess communication with official `dataforseo-mcp-server` npm package
-2. **No Fallback System**: All mock data removed - failures are transparent, returns empty results or raises exceptions
-3. **Multi-tab Interface**: 8 distinct analysis tabs with real DataForSEO data only
-4. **AI Enhancement**: LLM-powered insights for keyword clustering, content optimization, and full content generation
-5. **Keyword Preprocessing**: Automatic simplification of long/complex queries (>4 words) for better API results
-6. **LocalTunnel Integration**: Public URL access via https://bmm-seo-tools.loca.lt
+### 1. MCP Server Discovery (`mcp/client.py`)
+The system tries multiple methods to find the MCP server (lines 57-105):
+1. **npx** (for DigitalOcean/cloud deployments)
+2. **Direct command** (global install)
+3. **Local node_modules/.bin** 
+4. **Windows npm prefix** (AppData path)
 
-## Critical Components
+This multi-method approach ensures compatibility across local development and cloud deployments.
 
-### 1. MCP Communication (`mcp/client.py`)
-- **MCPClient**: Generic MCP server communication via stdio
-- **DataForSEOMCP**: Specific DataForSEO MCP integration with full API module support
-- **Key Methods**: Uses official DataForSEO MCP tools like:
-  - `dataforseo_labs_google_keyword_ideas`: Keyword suggestions
-  - `serp_organic_live_advanced`: Live SERP analysis
-  - `keywords_data_google_ads_search_volume`: Search volume data
-  - `dataforseo_labs_google_competitors_domain`: Competitor analysis
-  - `dataforseo_labs_google_ranked_keywords`: Domain ranking data
-  - `keywords_data_google_trends_explore`: Google Trends data
-  - `on_page_instant_pages`: Content analysis
-- **Error Handling**: Raises exceptions when MCP fails - no mock data fallbacks
-- **Keyword Preprocessing**: `_preprocess_keywords()` and `_simplify_keywords()` handle long queries (>4 words)
+### 2. Session State Management (`app.py`)
+**CRITICAL FOR DEPLOYMENTS**: Streamlit session state behaves differently on cloud platforms.
 
-### 2. Agent Layer (`agents/keyword_agent.py`)
-- **Unified Interface**: Single agent class for all SEO analysis functions
-- **Method Pattern**: Each analysis type has dedicated method with location/language mapping
-- **AI Integration**: Enhanced results with LLM-powered insights
-- **Country/Language Mapping**: Converts codes to full names required by DataForSEO API
-
-### 3. Advanced Content Generation (`agents/content_generator.py`)
-- **ContentGeneratorAgent**: Sophisticated content creation with 5 content type templates
-- **MCP Research Integration**: Uses real-time SERP and keyword data for content enhancement
-- **Chat Interface Support**: Handles conversation history and content refinement
-- **Improvement Suggestions**: AI-powered content analysis across 5 areas (SEO, readability, structure, CTA, audience)
-- **Export Capabilities**: Markdown, Text, and HTML formats
-
-### 4. AI Integration (`utils/llm_client.py`)
-- **OpenRouter Integration**: Multi-model LLM access with configurable models
-- **Model Configuration**: Defaults to `google/gemini-2.5-flash-lite` (August 2025)
-- **Token Management**: Optimized prompts with specific limits (1500 for insights, 800 for suggestions)
-
-### 5. Legacy MCP Components (`mcp/` directory)
-- **Status**: Preserved for reference but NOT used in current implementation
-- **Purpose**: Historical MCP-based integration (see master_untouched branch)
-- **Note**: These files exist but are not imported or used by the current REST implementation
-
-## Environment Configuration
-
-**Required Environment Variables:**
-```bash
-# DataForSEO MCP Authentication
-DATAFORSEO_USERNAME=your_username
-DATAFORSEO_PASSWORD=your_password
-
-# OpenRouter LLM Access  
-OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # default model
+For DigitalOcean specifically (lines 1057-1061):
+```python
+# Store content in multiple places for persistence
+st.session_state.generated_content = result
+st.session_state['content_backup'] = result['content']
+st.session_state['metadata_backup'] = result.get('metadata', {})
 ```
 
-## Public Demo with LocalTunnel
-
-### **Quick Start:**
-```bash
-./start_public_demo.sh
+Content display retrieves from multiple sources (lines 1121-1131):
+```python
+if 'generated_content' in st.session_state:
+    content_to_display = st.session_state.generated_content
+elif 'content_backup' in st.session_state:
+    # Reconstruct from backup
 ```
 
-**What it does:**
-1. **Sets environment variables** for MCP authentication
-2. **Installs dependencies** (npm packages including dataforseo-mcp-server)
-3. **Starts Streamlit** with MCP integration
-4. **Creates public URL** via LocalTunnel: https://bmm-seo-tools.loca.lt
+**Known Issue**: On DigitalOcean, `st.rerun()` can cause session state loss. The app works but users may need to interact with any UI element to trigger display refresh.
 
-### **Features:**
-- ✅ **Public Access**: Share URL with anyone worldwide
-- ✅ **Real DataForSEO Data**: Full MCP integration with live API
-- ✅ **All 8 Tabs Working**: Complete functionality
-- ✅ **AI-Powered Insights**: OpenRouter LLM integration
-- ✅ **Custom Subdomain**: Professional URL (bmm-seo-tools.loca.lt)
+### 3. Word Count Handling (`agents/content_generator.py`)
+- **Token calculation** (line 203): `max_tokens = min(int(word_count * 2.5), 6000)`
+- **Refine content** now accepts `target_word_count` parameter (line 466)
+- Prompt explicitly states: "Generate AT LEAST {word_count} words" (line 356)
 
-### **Requirements:**
-- **Node.js 20+**: Required for MCP server (check with `node --version`)
-- **Python 3.x**: For Streamlit application
-- **Internet Connection**: For LocalTunnel and DataForSEO API access
-
-## Data Processing Architecture
-
-### API Response Handling
-- **Keyword Data**: Direct processing of DataForSEO Labs responses
-- **SERP Data**: Real-time Google organic results parsing
-- **Volume Data**: Monthly search data with formatted display (prevents [object Object] issues)
-- **Competitor Data**: Domain intersection and ranking analysis
-- **Content Analysis**: On-page SEO metrics with proper field mapping
-
-### Critical Data Structure Updates
-- **Monthly Searches**: Processes array of objects into readable strings (`"2025-06: 165,000, 2025-05: 135,000"`)
-- **Content Metrics**: Nested structure handling (`content_metrics`, `meta`, `seo_checks`)
-- **Competitor Data**: Proper field mapping for `relevant_serp_items`, `intersections`, `etv`
-
-## Troubleshooting Patterns
-
-### REST API Issues
-- **Authentication**: Use username/password, not API key
-- **URL Handling**: Content analysis requires full URLs with protocol
-- **Long Keywords**: Automatically simplified (>4 words → first 4 words) for better results
-- **Monthly Data**: Formatted as readable strings to avoid display issues
-
-### Streamlit Widget Issues
-- **Unique Keys**: All input widgets have unique keys (e.g., `keyword_research_input`)
-- **Session State**: Content generation uses proper session state management
-- **Data Display**: Handles nested API responses correctly
-
-### Deployment Considerations
-- **Node.js Required**: MCP server needs Node.js 20+ for dataforseo-mcp-server package
-- **No Mock Data**: All fallbacks removed - failures raise exceptions or return empty results
-- **Real Data Only**: All endpoints return actual DataForSEO data or fail transparently
-- **Environment Variables**: Must be set correctly or initialization fails
+### 4. Competitor Keywords Limit (`mcp/client.py`)
+To ensure adequate results (lines 337-348):
+- Requests `max(limit * 2, 200)` from API
+- Returns only requested limit after processing
+- Note: Small domains may have fewer keywords than requested
 
 ## Tab-Specific Implementation
 
-### Tab 1: Keyword Research
-- **API**: `dataforseo_labs_google_keyword_ideas`
-- **Features**: Volume filtering, difficulty scoring, AI clustering
-- **Preprocessing**: Long keywords automatically simplified for better results
+### Tab 9: Domain Analytics (NEW)
+**File**: `app.py` lines 1235-1380
+- **Method**: `analyze_domain_rankings()` in `agents/keyword_agent.py`
+- **Features**: 
+  - Keyword position tracking
+  - Traffic estimation using ETV (Estimated Traffic Value)
+  - Position distribution (Top 3, Top 10, 11-20, 21-50)
+  - Quick wins identification (high volume, positions 4-20)
+  - AI-powered insights and recommendations
 
-### Tab 2: SERP Analysis
-- **API**: `serp_organic_live_advanced`
-- **Features**: Top 10 results, AI gap analysis, competitive insights
-- **Preprocessing**: Query simplification for complex searches
+### Tab 8: Advanced Content Generator (ENHANCED)
+**Recent Additions**:
+1. **Custom Heading Structure** (lines 988-1004):
+   - H1, H2, H3 count specification
+   - Keyword targeting per heading level
+   
+2. **Content Humanization** (lines 1005-1015):
+   - Tone options: professional, conversational, casual, formal, friendly
+   - Readability levels: basic, intermediate, advanced
+   - Natural language variations and colloquialisms
 
-### Tab 3: Competitor Analysis
-- **APIs**: `dataforseo_labs_google_competitors_domain`, `dataforseo_labs_google_ranked_keywords`
-- **Features**: Domain discovery, keyword intelligence, intersection analysis
-- **URL Handling**: Automatic domain extraction from full URLs
+3. **Word Count Refinement**:
+   - Refine content respects updated slider value
+   - Better token allocation for longer content
 
-### Tab 4: Trends & Volume
-- **APIs**: `keywords_data_google_ads_search_volume`, `keywords_data_google_trends_explore`
-- **Features**: Historical data, search volume trends, seasonal patterns
-- **Data Processing**: Monthly searches formatted for display, trends data with proper date handling
+## Deployment
 
-### Tab 5: Content Analysis
-- **API**: `on_page_instant_pages`
-- **Features**: OnPage scoring, technical SEO analysis, content metrics
-- **Data Structure**: Handles nested response format (no `onpage_result` wrapper)
-- **URL Processing**: Automatic HTTPS addition for bare domains
+### DigitalOcean App Platform ($5/month)
+**Current Production Setup**:
+- URL: Provided by DigitalOcean (e.g., `app-name-xxxxx.ondigitalocean.app`)
+- Auto-deploys from GitHub master branch
+- Environment variables set in DO dashboard
 
-### Tab 6: Reports & Analytics
-- **Features**: JSON and Excel export with timestamps
-- **Data**: Aggregated cross-tab session data
+**Required Files**:
+- `Procfile`: Specifies Streamlit run command
+- `runtime.txt`: Python version (python-3.11.9)
+- `package-lock.json`: MUST be committed for Node.js dependencies
+- `app.yaml`: DigitalOcean configuration
 
-### Tab 7: Content Brief Generation
-- **AI Tool**: OpenRouter LLM integration
-- **Features**: Keyword-based briefs, audience targeting, content structure
-- **Export**: Text and JSON formats
+**Known Issues**:
+1. **Session State**: Content may not display immediately after generation
+   - **Workaround**: Users interact with any UI element to trigger refresh
+   - **Root Cause**: Streamlit session state persistence differs on DO
+   
+2. **MCP Server**: Uses `npx` which may be slower than direct execution
+   - **Mitigation**: Increased timeouts, multiple discovery methods
 
-### Tab 8: Advanced Content Generator
-- **Features**: 5 content templates, real-time research integration, chat interface
-- **Content Types**: Blog Post, Landing Page, Product Page, Guide/Tutorial, Comparison Article
-- **Advanced**: Word count control (500-4000), refinement chat, improvement suggestions
-- **Export**: Markdown, Text, HTML formats with proper rendering
+3. **CORS Warnings**: Can be ignored, app functions normally
 
-## Important Implementation Notes
+### Alternative Deployment Options Considered
+1. **Streamlit Cloud**: ❌ No Node.js support for MCP server
+2. **Render.com**: ✅ Works well with Streamlit, similar pricing
+3. **Railway**: ✅ Good Docker support, easy deployment
+4. **DigitalOcean Droplet**: ✅ Full control but requires manual setup
+5. **Windows Local**: ❌ Attempted but abandoned due to complexity
 
-### API Authentication Changes
-- **OLD**: Used `DATAFORSEO_API_KEY` environment variable
-- **NEW**: Uses `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD` for Basic Auth
-- **UI Status**: Fixed to check correct environment variables
+## Environment Variables
 
-### Content Analysis Evolution
-- **Issue**: Original expected `onpage_result` wrapper that doesn't exist in API
-- **Fix**: Data extracted directly from main response object
-- **Result**: Real metrics (95.24/100 scores, actual word counts, page sizes)
+```bash
+# Required for MCP/DataForSEO
+DATAFORSEO_USERNAME=your_username
+DATAFORSEO_PASSWORD=your_password  # Not API key!
 
-### Mock Data Removal
-- **Client Request**: Remove all mock/fallback data to ensure transparency
-- **Implementation**: All methods return empty results if API fails
-- **Benefit**: Clear visibility when API issues occur
+# Required for AI features
+OPENROUTER_API_KEY=your_key
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite  # Optional, this is default
 
-### Keyword Processing Intelligence
-- **Long Query Handling**: Queries >4 words automatically simplified
-- **Example**: "top 10 cheese burger restaurants in sydney" → "top cheese burger restaurants"
-- **Applied To**: Keyword suggestions, SERP analysis, search volume, trends data
-- **Result**: Better API response rates for complex queries
+# Automatically set by DigitalOcean
+DIGITALOCEAN_APP_ID=xxxxx  # Used for platform detection
+```
 
-## Git Branch Strategy
+## Recent Session Achievements
 
-- **master**: Current production branch with REST API implementation
-- **master_untouched**: Historical MCP-based implementation (preserved for reference)
-- **Deployment**: Use master branch for all deployments (Streamlit Cloud compatible)
+### Features Implemented
+1. **Tab 9 Domain Analytics**: Complete domain ranking analysis with traffic estimation
+2. **Enhanced Content Generation**: 
+   - Custom heading structures with keyword targeting
+   - Humanized content with tone/readability controls
+   - Fixed word count accuracy (increased token limits)
+3. **Competitor Keywords**: Increased limit from 20 to 100 (requests 200 from API)
+4. **Session State Fixes**: Dual storage mechanism for DigitalOcean compatibility
 
-## Recent Critical Fixes (Latest Session)
+### Problems Solved
+1. **Mock Data Removal**: All fallback data eliminated for transparency
+2. **Content Display on DO**: Added backup storage keys for session persistence
+3. **Word Count Issues**: 
+   - Increased token multiplier from 2x to 2.5x
+   - Raised cap from 4000 to 6000 tokens
+   - Made refinement respect slider value
+4. **MCP Server Discovery**: Multi-method approach for cross-platform compatibility
+5. **API Key Exposure**: Removed from Git history, using environment variables only
 
-### Mock Data Elimination
-- **Issue**: Mock data was masking real API failures and displaying fake results
-- **Fix**: Completely removed all mock data generators and fallback systems
-- **Files Modified**: `mcp/client.py`, `mcp/enhanced_processing.py`, `agents/keyword_agent.py`
-- **Result**: Failures now raise exceptions immediately, ensuring data transparency
+### Abandoned Attempts
+1. **Windows Installation Package**: Created setup.bat, setup.ps1, but removed due to:
+   - Complex PATH issues
+   - MCP server installation problems
+   - Client opted for cloud deployment instead
 
-### Content Analysis Field Mapping Fix
-- **Issue**: Content analysis showing OnPage Score 93.4 but Word Count/Load Time/Page Size as 0
-- **Root Cause**: Streamlit app was looking for data in wrong nested structure
-- **Fix**: Updated field mappings in `app.py` to match actual MCP response structure:
-  - `content_data.get('word_count')` instead of `content_data.get('content_metrics', {}).get('word_count')`
-  - `content_data.get('load_time')` instead of `content_data.get('page_timing', {}).get('load_time')`
-  - `content_data.get('page_size')` instead of `content_data.get('content_metrics', {}).get('page_size')`
-- **Result**: Now displays real values (Word Count: 26, Load Time: 503ms, Page Size: 1248 bytes)
+## Testing Insights
 
-### MCP Client Error Handling Improvements  
-- **Issue**: `'DataForSEOMCP' object has no attribute 'use_fallback'` error
-- **Fix**: Removed all references to `use_fallback` attribute across codebase
-- **Files Modified**: `mcp/client.py`, `agents/keyword_agent.py`
-- **Result**: Clean initialization without attribute errors
+### Domain Size Matters
+- Small domains (e.g., bluemoonmarketing.com.au): May only have 10-20 keywords
+- Large domains (e.g., semrush.com): Will return full 100 keywords
+- The code works correctly; it's a data availability issue
 
-### Environment Variable Validation
-- **Issue**: MCP client failing with "expected str, bytes or os.PathLike object, not NoneType"
-- **Fix**: Added proper validation for required environment variables in `mcp/client.py`
-- **Result**: Clear error messages when credentials are missing instead of cryptic errors
+### Local vs Cloud Differences
+| Aspect | Local | DigitalOcean |
+|--------|-------|--------------|
+| MCP Server | Direct execution | Via npx |
+| Session State | Persistent | May reset on rerun |
+| Performance | Fast | Network latency |
+| st.rerun() | Works perfectly | Can cause state loss |
 
-### Content Generator MCP Integration Fix
-- **Issue**: ContentGeneratorAgent still importing old REST client
-- **Fix**: Updated to use MCP client (`from mcp.client import DataForSEOMCP`)
-- **Result**: Content generation now uses real-time MCP research data
+## Code Patterns to Maintain
+
+### Always Check Environment
+```python
+import os
+if os.getenv('DIGITALOCEAN_APP_ID'):
+    # Cloud-specific behavior
+else:
+    # Local development behavior
+```
+
+### MCP Error Handling
+```python
+try:
+    result = self.dataforseo_mcp.method()
+except Exception as e:
+    print(f"MCP failed: {str(e)}")
+    return []  # Return empty, never mock data
+```
+
+### Session State Redundancy
+```python
+# Store in multiple places
+st.session_state.main_key = data
+st.session_state['backup_key'] = data['important_field']
+```
+
+## Critical Files
+
+- `app.py`: Main UI, all 9 tabs, session state management
+- `agents/keyword_agent.py`: All DataForSEO API interactions
+- `agents/content_generator.py`: Content generation with AI
+- `mcp/client.py`: MCP server communication, multi-method discovery
+- `mcp/enhanced_processing.py`: Response parsing, ETV extraction
+- `utils/llm_client.py`: OpenRouter integration
+
+## Never Do This
+1. **Don't add mock data** - Client requires real data only
+2. **Don't commit .env or secrets** - Use environment variables
+3. **Don't assume single platform** - Code must work locally and on cloud
+4. **Don't trust st.rerun() on cloud** - It may clear session state
+5. **Don't hardcode limits** - Make them configurable parameters
+
+## Quick Debugging
+
+### Content Not Showing on DigitalOcean
+1. Check Runtime Logs for "DEBUG: Content stored, length: XXXX"
+2. Verify content_backup keys in session state
+3. Try moving any UI slider to trigger refresh
+
+### Keyword Count Issues
+1. Test with large domain (amazon.com, wikipedia.org)
+2. Check if domain actually has that many keywords
+3. Verify actual_limit calculation in mcp/client.py
+
+### MCP Server Not Found
+1. Run `npm list -g dataforseo-mcp-server`
+2. Check all 4 discovery methods in mcp/client.py
+3. Verify Node.js version is 20+
+
+## Session Summary
+This codebase evolved from a mock-data prototype to a production-ready SEO tool deployed on DigitalOcean. The main challenges were cloud platform compatibility (especially Streamlit session state) and ensuring real data transparency. The solution uses redundant storage mechanisms and platform-specific behavior to maintain functionality across environments.
