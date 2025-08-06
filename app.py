@@ -7,7 +7,6 @@ import json
 import random
 from dotenv import load_dotenv
 from urllib.parse import urlparse
-import time 
 
 # Load environment variables
 load_dotenv()
@@ -1064,8 +1063,15 @@ with tab8:
                             })
                             
                             st.success("✅ Content generated successfully!")
-                            time.sleep(0.5)
-                            st.rerun()
+                            
+                            # Platform-specific handling for DigitalOcean
+                            import os
+                            if os.getenv('DIGITALOCEAN_APP_ID'):
+                                # On DigitalOcean, don't rerun - causes session issues
+                                st.info("👆 Click anywhere or press Tab to see the generated content")
+                            else:
+                                # Local development - rerun works fine
+                                st.rerun()
                             
                         except Exception as e:
                             st.error(f"Generation error: {str(e)}")
