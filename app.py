@@ -1055,6 +1055,8 @@ with tab8:
                             )
                             
                             st.session_state.generated_content = result
+                            # Debug: Log to see if content is actually there
+                            print(f"DEBUG: Content stored, length: {len(result.get('content', ''))}")
                             
                             # Add AI response to chat
                             st.session_state.chat_history.append({
@@ -1114,9 +1116,11 @@ with tab8:
     with content_col:
         st.markdown("#### 📄 Generated Content")
         
-        if st.session_state.generated_content:
+        # Try to get content from session state or backup
+        content_to_display = st.session_state.get('generated_content') or st.session_state.get('backup_content')
+        if content_to_display:
             # Display metadata
-            meta = st.session_state.generated_content.get('metadata', {})
+            meta = content_to_display.get('metadata', {})
             meta_col1, meta_col2, meta_col3 = st.columns(3)
             
             with meta_col1:
@@ -1129,7 +1133,7 @@ with tab8:
             
             # Display content in expandable section
             with st.expander("📝 Full Content", expanded=True):
-                st.markdown(st.session_state.generated_content['content'])
+                st.markdown(content_to_display['content'])
             
             # Show research data if available
             research_data = st.session_state.generated_content.get('research_data', {})
