@@ -1115,7 +1115,7 @@ with tab8:
                             })
                             
                             st.success("✅ Content generated successfully!")
-                            st.rerun()
+                            # st.rerun()  # Removed: Causing refresh loop
                             
                         except Exception as e:
                             st.error(f"Generation error: {str(e)}")
@@ -1160,7 +1160,7 @@ with tab8:
                         })
                         
                         st.success("✅ Content refined!")
-                        st.rerun()
+                        # st.rerun()  # Removed: Causing refresh loop
                         
                     except Exception as e:
                         st.error(f"Refinement error: {str(e)}")
@@ -1375,7 +1375,7 @@ with tab8:
                     st.session_state['metadata_backup'] = st.session_state.generated_content['metadata']
                     
                     st.success("✅ Original content restored")
-                    st.rerun()
+                    # st.rerun()  # Removed: Causing refresh loop
         else:
             st.info("👆 Configure your content settings and click 'Generate Content' to begin")
             
