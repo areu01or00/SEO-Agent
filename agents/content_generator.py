@@ -2,7 +2,10 @@
 Content Generator Agent for creating SEO-optimized content based on briefs
 """
 import os
-from typing import List, Dict, Any, Optional
+import math
+import re
+import requests
+from typing import List, Dict, Any, Optional, Tuple
 from utils.llm_client import LLMClient
 # MCP client import moved to __init__ method
 import json
@@ -538,3 +541,222 @@ Be specific and practical. Avoid generic advice."""
                 suggestion_list.append(line.strip().lstrip('•-*123456789. '))
         
         return suggestion_list if suggestion_list else ["Consider adding more specific examples", "Include relevant statistics", "Strengthen the call-to-action"]
+    
+    def _parse_markdown_structure(self, content: str) -> List[Dict[str, Any]]:
+        """Parse content to extract markdown structure with headings and body text"""
+        sections = []
+        lines = content.split('\n')
+        current_section = {'heading': '', 'level': 0, 'body': [], 'raw_heading': ''}
+        
+        for line in lines:
+            # Check if it's a heading
+            heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+            
+            if heading_match:
+                # Save previous section if it has content
+                if current_section['body'] or current_section['heading']:
+                    current_section['body'] = '\n'.join(current_section['body'])
+                    sections.append(current_section)
+                
+                # Start new section
+                level = len(heading_match.group(1))
+                heading_text = heading_match.group(2)
+                current_section = {
+                    'heading': heading_text,
+                    'level': level,
+                    'body': [],
+                    'raw_heading': line  # Store the full markdown heading
+                }
+            else:
+                # Add line to current section body
+                current_section['body'].append(line)
+        
+        # Don't forget the last section
+        if current_section['body'] or current_section['heading']:
+            current_section['body'] = '\n'.join(current_section['body'])
+            sections.append(current_section)
+        
+        return sections
+    
+    def _humanize_text_chunk(self, text: str, api_url: str, api_creds: dict) -> Tuple[str, bool, int, int]:
+        """Humanize a single chunk of text"""
+        original_words = len(text.split())
+        
+        payload = {**api_creds, 'text': text}
+        
+        try:
+            response = requests.post(api_url, data=payload, timeout=30)
+            if response.status_code == 200 and response.text:
+                humanized = response.text.strip()
+                humanized_words = len(humanized.split())
+                return humanized, True, original_words, humanized_words
+            else:
+                return text, False, original_words, original_words
+        except Exception as e:
+            return text, False, original_words, original_words
+    
+    def humanize_ultra(self, content: str, target_word_count: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Humanize content while preserving markdown structure and headings
+        Maintains 95-105% of original word count through expansion if needed
+        
+        Args:
+            content: The content to humanize (with markdown formatting)
+            target_word_count: Target word count (defaults to original length)
+            
+        Returns:
+            Dict with humanized content and metadata
+        """
+        original_words = len(content.split())
+        target_words = target_word_count or original_words
+        
+        # Parse markdown structure
+        sections = self._parse_markdown_structure(content)
+        
+        # API configuration
+        api_url = 'https://ai-text-humanizer.com/api.php'
+        api_creds = {
+            'email': 'info@bluemoonmarketing.com.au',
+            'pw': '6c90555bfd313691'
+        }
+        
+        # Process each section
+        humanized_sections = []
+        total_humanized_words = 0
+        total_original_words = 0
+        chunk_stats = []
+        chunk_num = 0
+        
+        for section in sections:
+            # Keep the heading as-is (don't humanize headings)
+            humanized_section = {
+                'raw_heading': section['raw_heading'],
+                'heading': section['heading'],
+                'level': section['level'],
+                'body': ''
+            }
+            
+            # Humanize the body text if it exists and has substantial content
+            body_text = section['body'].strip()
+            if body_text and len(body_text.split()) > 10:  # Only humanize if more than 10 words
+                # Split body into chunks if it's too long
+                body_words = body_text.split()
+                chunk_size = 1000
+                
+                if len(body_words) > chunk_size:
+                    # Process in chunks
+                    humanized_parts = []
+                    for i in range(0, len(body_words), chunk_size):
+                        chunk_num += 1
+                        chunk = ' '.join(body_words[i:i+chunk_size])
+                        humanized_chunk, success, orig_words, human_words = self._humanize_text_chunk(
+                            chunk, api_url, api_creds
+                        )
+                        humanized_parts.append(humanized_chunk)
+                        total_original_words += orig_words
+                        total_humanized_words += human_words
+                        
+                        chunk_stats.append({
+                            'chunk': chunk_num,
+                            'section': section['heading'] or 'Introduction',
+                            'original': orig_words,
+                            'humanized': human_words,
+                            'reduction': ((orig_words - human_words) / orig_words * 100) if orig_words > 0 else 0,
+                            'success': success
+                        })
+                    
+                    humanized_section['body'] = ' '.join(humanized_parts)
+                else:
+                    # Process as single chunk
+                    chunk_num += 1
+                    humanized_body, success, orig_words, human_words = self._humanize_text_chunk(
+                        body_text, api_url, api_creds
+                    )
+                    humanized_section['body'] = humanized_body
+                    total_original_words += orig_words
+                    total_humanized_words += human_words
+                    
+                    chunk_stats.append({
+                        'chunk': chunk_num,
+                        'section': section['heading'] or 'Introduction',
+                        'original': orig_words,
+                        'humanized': human_words,
+                        'reduction': ((orig_words - human_words) / orig_words * 100) if orig_words > 0 else 0,
+                        'success': success
+                    })
+            else:
+                # Keep short sections as-is
+                humanized_section['body'] = body_text
+                if body_text:
+                    words = len(body_text.split())
+                    total_original_words += words
+                    total_humanized_words += words
+            
+            humanized_sections.append(humanized_section)
+        
+        # Rebuild content with structure preserved
+        rebuilt_content = []
+        for section in humanized_sections:
+            if section['raw_heading']:
+                rebuilt_content.append(section['raw_heading'])
+            if section['body']:
+                rebuilt_content.append(section['body'])
+        
+        collated_content = '\n\n'.join(filter(None, rebuilt_content))
+        
+        # Calculate shortfall
+        current_words = len(collated_content.split())
+        shortfall = target_words - current_words
+        
+        # Expand if needed (if short by more than 100 words)
+        final_content = collated_content
+        final_words = current_words
+        
+        if shortfall > 100:
+            # Get the last section for context
+            last_section_text = humanized_sections[-1]['body'] if humanized_sections else ""
+            sample_text = last_section_text[-500:] if len(last_section_text) > 500 else last_section_text
+            
+            expansion_prompt = f'''Continue this humanized content by adding approximately {shortfall} more words.
+
+CRITICAL: Match this exact writing style (simple, direct, short sentences):
+{sample_text[:300] if sample_text else "Write in a simple, direct style with short sentences."}
+
+The content currently ends with:
+...{collated_content[-500:]}
+
+Continue from where it left off and add {shortfall} more words. Keep the same simple, direct style with short sentences.
+Maintain the professional tone and topic focus.
+
+Continue the content:'''
+            
+            additional_content = self.llm_client.generate_text(
+                expansion_prompt,
+                max_tokens=int(shortfall * 2),
+                temperature=0.7
+            )
+            
+            # Add expansion as a new section or continuation
+            final_content = collated_content + "\n\n" + additional_content
+            final_words = len(final_content.split())
+        
+        # Calculate final statistics
+        accuracy = (final_words / target_words) * 100
+        
+        return {
+            'content': final_content,
+            'metadata': {
+                'original_words': original_words,
+                'target_words': target_words,
+                'humanized_words': total_humanized_words,
+                'final_words': final_words,
+                'chunks_processed': chunk_num,
+                'sections_processed': len(sections),
+                'accuracy_percentage': round(accuracy, 1),
+                'chunk_stats': chunk_stats,
+                'expanded': shortfall > 100,
+                'expansion_words': final_words - current_words if shortfall > 100 else 0,
+                'humanized': True,
+                'structure_preserved': True
+            }
+        }

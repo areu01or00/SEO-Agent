@@ -4,6 +4,7 @@ from agents.keyword_agent import KeywordAgent
 from utils.export import export_to_csv, export_to_excel
 import os
 import json
+import math
 import random
 from dotenv import load_dotenv
 from urllib.parse import urlparse
@@ -463,7 +464,23 @@ with tab5:
                     content_data = agent.analyze_content(content_url, enable_js)
                     
                     if content_data:
-                        st.success("✅ Content analysis complete!")
+                        extraction_method = content_data.get('extraction_method', 'unknown')
+                        has_additional = content_data.get('additional_metrics') == 'dataforseo'
+                        
+                        # Show extraction status
+                        if extraction_method == 'trafilatura':
+                            st.success("✅ **Content Successfully Analyzed!**")
+                            if has_additional:
+                                st.info("📊 Using Trafilatura extraction with additional DataForSEO metrics (load time, readability)")
+                            elif content_data.get('protected_site'):
+                                st.info("🔒 Site is Cloudflare-protected. Using Trafilatura extraction (performance metrics unavailable)")
+                            else:
+                                st.info("📄 Using Trafilatura extraction for content analysis")
+                        elif extraction_method == 'dataforseo':
+                            st.success("✅ **Content analysis complete!**")
+                            st.info("📊 Using DataForSEO API for full metrics")
+                        else:
+                            st.warning("⚠️ Content extraction method unknown")
                         
                         # Display content metrics
                         metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
@@ -509,12 +526,22 @@ with tab5:
                         detail_col1, detail_col2 = st.columns(2)
                         
                         with detail_col1:
-                            meta = content_data.get('meta', {})
+                            # Get title and description directly from content_data
+                            title = content_data.get('title', 'N/A')
+                            meta_desc = content_data.get('meta_description', 'N/A')
+                            
+                            # Display based on extraction method
+                            extraction_method = content_data.get('extraction_method', '')
+                            
                             st.markdown("**Title:**")
-                            st.write(meta.get('title', 'N/A'))
+                            st.write(title if title else 'N/A')
+                            if extraction_method == 'trafilatura':
+                                st.caption("📄 Extracted via Trafilatura")
+                            elif extraction_method == 'dataforseo':
+                                st.caption("📊 From DataForSEO API")
                             
                             st.markdown("**Meta Description:**")
-                            st.write(meta.get('description', 'N/A'))
+                            st.write(meta_desc if meta_desc else 'N/A')
                             
                             st.markdown("**H1 Tags:**")
                             for h1 in content_data.get('h1_tags', [])[:3]:
@@ -549,18 +576,39 @@ with tab5:
                             st.write(f"{status} Meta Desc")
                         
                         with check_col4:
-                            status = "✅" if not api_checks.get('no_favicon', True) else "❌"
+                            # Check for favicon in seo_checks first, then api_checks
+                            has_favicon = seo_checks.get('has_favicon', False) or not api_checks.get('no_favicon', True)
+                            status = "✅" if has_favicon else "❌"
                             st.write(f"{status} Favicon")
                         
                         with check_col5:
-                            status = "✅" if api_checks.get('seo_friendly_url', False) else "❌"
+                            # Check for SEO friendly URL in seo_checks first, then api_checks
+                            seo_friendly = seo_checks.get('seo_friendly_url', False) or api_checks.get('seo_friendly_url', False)
+                            status = "✅" if seo_friendly else "❌"
                             st.write(f"{status} SEO URL")
                         
                         # AI Insights
+                        st.markdown("#### 🤖 AI Optimization Insights")
+                        
                         if content_data.get('ai_insights'):
-                            st.markdown("#### 🤖 AI Optimization Insights")
                             with st.expander("📝 View Full Analysis", expanded=True):
-                                st.markdown(content_data['ai_insights'])
+                                # Display the AI insights
+                                insights = content_data['ai_insights']
+                                if insights:
+                                    st.markdown(insights)
+                                else:
+                                    st.info("Generating insights...")
+                        else:
+                            # Generate insights if not available
+                            with st.spinner("Generating AI insights..."):
+                                from agents.keyword_agent import KeywordAgent
+                                agent = KeywordAgent()
+                                insights = agent._generate_content_insights(content_data)
+                                if insights:
+                                    with st.expander("📝 View Full Analysis", expanded=True):
+                                        st.markdown(insights)
+                                else:
+                                    st.warning("Could not generate AI insights")
                     else:
                         st.warning("No content data found")
                         
@@ -1242,6 +1290,92 @@ with tab8:
                     file_name=f"content_{title.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
                     mime="text/html"
                 )
+            
+            # Humanize Ultra button
+            st.markdown("#### 🤖 Advanced Humanization")
+            
+            # Check if content is already humanized
+            is_humanized = st.session_state.generated_content.get('metadata', {}).get('humanized', False)
+            
+            if is_humanized:
+                st.info("✅ This content has already been humanized")
+            
+            if st.button("🤖 Humanize Ultra", 
+                        disabled=is_humanized,
+                        help="Apply advanced humanization using chunk-based processing to maintain natural flow and readability"):
+                
+                # Store original content before humanization
+                if 'original_before_humanize' not in st.session_state:
+                    st.session_state.original_before_humanize = st.session_state.generated_content['content']
+                
+                with st.spinner("🔄 Humanizing content..."):
+                    try:
+                        from agents.content_generator import ContentGeneratorAgent
+                        generator = ContentGeneratorAgent()
+                        
+                        # Get current content and word count
+                        current_content = st.session_state.generated_content['content']
+                        current_words = len(current_content.split())
+                        
+                        # Calculate chunks for progress display
+                        num_chunks = math.ceil(current_words / 1000)
+                        
+                        # Create a progress placeholder
+                        progress_placeholder = st.empty()
+                        progress_placeholder.info(f"Processing {num_chunks} chunks of ~1000 words each...")
+                        
+                        # Humanize the content
+                        humanized_result = generator.humanize_ultra(
+                            content=current_content,
+                            target_word_count=current_words
+                        )
+                        
+                        # Update content and metadata
+                        st.session_state.generated_content['content'] = humanized_result['content']
+                        st.session_state.generated_content['metadata'].update(humanized_result['metadata'])
+                        
+                        # Also update backup storage
+                        st.session_state['content_backup'] = humanized_result['content']
+                        st.session_state['metadata_backup'] = st.session_state.generated_content['metadata']
+                        
+                        # Clear progress and show success
+                        progress_placeholder.empty()
+                        
+                        # Show humanization stats
+                        meta = humanized_result['metadata']
+                        st.success(f"""✅ Humanization Complete!
+                        - Original: {meta['original_words']} words
+                        - Humanized: {meta['final_words']} words
+                        - Accuracy: {meta['accuracy_percentage']}%
+                        - Chunks processed: {meta['chunks_processed']}
+                        {"- Content expanded to maintain length" if meta['expanded'] else ""}""")
+                        
+                        # Add to chat history
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': f"Content humanized successfully. Final word count: {meta['final_words']} words ({meta['accuracy_percentage']}% of target)."
+                        })
+                        
+                        # Force a rerun to update the display
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Humanization error: {str(e)}")
+            
+            # Option to restore original (only show if content has been humanized)
+            if is_humanized and 'original_before_humanize' in st.session_state:
+                if st.button("↩️ Restore Original", help="Revert to the original non-humanized content"):
+                    st.session_state.generated_content['content'] = st.session_state.original_before_humanize
+                    st.session_state.generated_content['metadata']['humanized'] = False
+                    st.session_state['content_backup'] = st.session_state.original_before_humanize
+                    
+                    # Recalculate word count
+                    original_words = len(st.session_state.original_before_humanize.split())
+                    st.session_state.generated_content['metadata']['word_count'] = original_words
+                    st.session_state['metadata_backup'] = st.session_state.generated_content['metadata']
+                    
+                    st.success("✅ Original content restored")
+                    st.rerun()
         else:
             st.info("👆 Configure your content settings and click 'Generate Content' to begin")
             

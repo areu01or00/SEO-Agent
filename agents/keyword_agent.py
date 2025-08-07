@@ -232,15 +232,53 @@ class KeywordAgent:
         enable_javascript: bool = True
     ) -> Dict[str, Any]:
         """
-        Analyze on-page content of a URL
+        Analyze on-page content of a URL using Trafilatura as primary method
         """
         try:
             print(f"🔍 Analyzing content for: {url}")
             
-            # Get content analysis via MCP
-            content_data = self.dataforseo_mcp.get_content_analysis(url=url)
+            # Use Trafilatura as PRIMARY method
+            from utils.content_extractor import ContentExtractor
+            extractor = ContentExtractor()
             
-            print(f"📊 Retrieved content analysis from MCP")
+            print(f"📊 Extracting content with Trafilatura (primary method)...")
+            content_data = extractor.extract_content(url)
+            
+            if content_data:
+                print(f"✅ Successfully extracted content using Trafilatura!")
+                content_data['extraction_method'] = 'trafilatura'
+                
+                # Optionally try to get additional metrics from DataForSEO
+                # (like Core Web Vitals, load time, etc.)
+                if enable_javascript:
+                    try:
+                        print(f"🔄 Attempting to get additional metrics from DataForSEO...")
+                        mcp_data = self.dataforseo_mcp.get_content_analysis(url=url)
+                        
+                        # If we get real data (not blocked), merge the metrics
+                        if mcp_data and 'Robot Challenge' not in mcp_data.get('title', ''):
+                            # Add performance metrics that Trafilatura can't provide
+                            content_data['load_time'] = mcp_data.get('load_time', 0)
+                            content_data['performance'] = mcp_data.get('performance', {})
+                            content_data['readability'] = mcp_data.get('readability', {})
+                            content_data['additional_metrics'] = 'dataforseo'
+                            print(f"✅ Added performance metrics from DataForSEO")
+                        else:
+                            print(f"⚠️ DataForSEO blocked (Cloudflare), using Trafilatura data only")
+                            content_data['protected_site'] = True
+                    except Exception as e:
+                        print(f"⚠️ Could not get additional metrics: {str(e)}")
+                        # Continue with Trafilatura data only
+            else:
+                # If Trafilatura fails, try DataForSEO as fallback
+                print(f"⚠️ Trafilatura extraction failed, trying DataForSEO...")
+                content_data = self.dataforseo_mcp.get_content_analysis(url=url)
+                
+                if content_data:
+                    content_data['extraction_method'] = 'dataforseo'
+                    if 'Robot Challenge' in content_data.get('title', ''):
+                        content_data['protected_site'] = True
+                        content_data['protection_message'] = "Both extraction methods failed due to protection."
             
             # Add AI insights for content optimization
             if content_data:

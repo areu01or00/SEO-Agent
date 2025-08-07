@@ -239,11 +239,11 @@ def process_content_analysis_data(raw_data: Dict) -> Dict[str, Any]:
                 "load_time": load_time,
                 "seo_checks": {
                     "has_https": checks.get("is_https", False),
-                    "has_title": not checks.get("title_too_short", True),
-                    "has_description": not checks.get("no_description", True),
-                    "has_favicon": not checks.get("no_favicon", True),
+                    "has_title": bool(meta.get("title")),  # Just check if title exists
+                    "has_description": bool(meta.get("description")),  # Just check if description exists
+                    "has_favicon": not checks.get("no_favicon", False),  # Check the no_favicon flag
                     "seo_friendly_url": checks.get("seo_friendly_url", False),
-                    "has_h1_tag": not checks.get("no_h1_tag", True),
+                    "has_h1_tag": bool(htags.get("h1", [])),  # Just check if h1 tags exist
                     "has_canonical": checks.get("canonical", False)
                 },
                 "readability": {

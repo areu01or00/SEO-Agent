@@ -503,12 +503,16 @@ class DataForSEOMCP:
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
             
+            # Use advanced browser parameters to bypass protection
             result = self.client.call_tool(
                 "dataforseo",
                 "on_page_instant_pages",
                 {
                     "url": url,
-                    "enable_javascript": enable_javascript
+                    "enable_javascript": enable_javascript,
+                    "enable_browser_rendering": True,
+                    "load_resources": True,
+                    "custom_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
             )
             
