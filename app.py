@@ -1357,7 +1357,7 @@ with tab8:
                         })
                         
                         # Force a rerun to update the display
-                        st.rerun()
+                        # st.rerun()  # Removed: Causing infinite loop on Digital Ocean
                         
                     except Exception as e:
                         st.error(f"Humanization error: {str(e)}")
